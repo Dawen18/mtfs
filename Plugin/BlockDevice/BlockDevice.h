@@ -7,7 +7,7 @@
 #include <iostream>
 #include <assert.h>
 
-#include "Plugin.h"
+#include <FileStorage/Plugin.h>
 #include <FileStorage/structs.h>
 
 namespace PluginSystem {
