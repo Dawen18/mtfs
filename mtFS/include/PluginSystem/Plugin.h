@@ -7,12 +7,17 @@
 #include <iostream>
 #include <assert.h>
 
-#include "FileStorage/structs.h"
+#include <FileStorage/structs.h>
+#include <map>
 
 namespace PluginSystem {
 	class Plugin {
 	public:
-		virtual bool init(int blockSize, std::vector<std::string> params)=0;
+		virtual std::vector<std::string> getInfos()=0;
+
+		virtual bool attach(std::map<std::string, std::string> params)=0;
+
+		virtual bool detach()=0;
 
 		virtual bool addInode(std::uint64_t &inodeId)=0;
 

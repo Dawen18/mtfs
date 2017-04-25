@@ -2,20 +2,108 @@
 #include <vector>
 #include <list>
 #include <iostream>
+#include <sys/mount.h>
+#include <map>
+#include <zconf.h>
+#include <cstring>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <rapidjson/document.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/prettywriter.h>
+#include <rapidjson/istreamwrapper.h>
+#include <fstream>
 
 #include "BlockDevice.h"
 
+
+using namespace std;
+using namespace rapidjson;
+
 namespace PluginSystem {
-	bool BlockDevice::init(int blockSize, std::vector<std::string> params) {
-		return false;
+	BlockDevice::BlockDevice() {
+		srand((unsigned int) time(NULL));
+		this->nextFreeInode = 1;
+	}
+
+	vector<string> BlockDevice::getInfos() {
+		vector<string> infos;
+		infos.push_back("block");
+		infos.push_back("devicePath");
+
+		return infos;
+	}
+
+	bool BlockDevice::attach(std::map<string, string> params) {
+		if (params.find("blocksize") == params.end() || params.find("devicePath") == params.end() ||
+			params.find("home") == params.end() || params.find("fsType") == params.end())
+			return false;
+
+		this->blockSize = stoi(params.at("blocksize"));
+		string home;
+		home = params.at("home");
+		this->fsType = params.at("fsType");
+		this->devicePath = params.at("devicePath");
+		this->mountpoint = home + this->devicePath.substr(this->devicePath.find('/', 1) + 1);
+
+		if (!dirExists(this->mountpoint)) {
+			if (mkdir(this->mountpoint.c_str(), 0700) != 0) {
+				logError("mkdir error " + this->mountpoint + " " + strerror(errno));
+				return false;
+			}
+		}
+
+#ifndef DEBUG
+		//		Mount device
+		mount(this->devicePath.c_str(), this->mountpoint.c_str(), this->fsType.c_str(), 0, NULL);
+#endif
+
+		initDirHierarchie();
+
+		initInodes();
+
+		return true;
+	}
+
+	bool BlockDevice::detach() {
+		writeMetas();
+
+
+#ifndef DEBUG
+		if (umount(this->mountpoint.c_str()) != 0) {
+			cerr << "ERROR Failed to umount: " << this->mountpoint << endl;
+			cerr << "reason: " << strerror(errno) << " [" << errno << "]" << endl;
+			return false;
+		}
+#endif
+
+		return true;
 	}
 
 	bool BlockDevice::addInode(std::uint64_t &inodeId) {
-		return false;
+		if (this->freeInodes.size() == 0) {
+			inodeId = this->nextFreeInode;
+			this->nextFreeInode++;
+		} else {
+			inodeId = this->freeInodes[0];
+			this->freeInodes.erase(freeInodes.begin());
+		}
+
+		string filename = this->mountpoint + "/inodes/" + to_string(inodeId);
+
+		return createFile(filename);
 	}
 
 	bool BlockDevice::delInode(std::uint64_t inodeId) {
-		return false;
+		if (this->nextFreeInode - 1 == inodeId)
+			this->nextFreeInode--;
+		else {
+			this->freeInodes.push_back(inodeId);
+		}
+
+		string filename = this->mountpoint + "/inodes/" + to_string(inodeId);
+
+		return deleteFile(filename);
 	}
 
 	bool BlockDevice::readInode(std::uint64_t inodeId, FileStorage::inode_st &inode) {
@@ -49,5 +137,114 @@ namespace PluginSystem {
 	bool BlockDevice::writeSuperblock(FileStorage::superblock_t superblock) {
 		return false;
 	}
+
+	/////////////Private method///////////////
+
+	void BlockDevice::initDirHierarchie() {
+		if (!dirExists(this->mountpoint + "/inodes"))
+			mkdir((this->mountpoint + "/inodes").c_str(), 0700);
+		if (!dirExists(this->mountpoint + "/blocks"))
+			mkdir((this->mountpoint + "/blocks").c_str(), 0700);
+		if (!dirExists(this->mountpoint + "/meta"))
+			mkdir((this->mountpoint + "/metas").c_str(), 0700);
+	}
+
+	void BlockDevice::initInodes() {
+		string inodeFilename = this->mountpoint + "/metas/inodes.json";
+		ifstream inodeFile(inodeFilename);
+		if (!inodeFile.is_open())
+			return;
+
+		IStreamWrapper isw(inodeFile);
+
+		Document d;
+		d.ParseStream(isw);
+
+		assert(d.IsObject());
+		assert(d.HasMember("nextFreeInode"));
+		assert(d.HasMember("freeInodes"));
+		this->nextFreeInode = d["nextFreeInode"].GetUint64();
+		const Value &inodeArray = d["freeInodes"];
+
+		this->freeInodes.clear();
+		assert(inodeArray.IsArray());
+		for (SizeType i = 0; i < inodeArray.Size(); i++) {
+			this->freeInodes.push_back(inodeArray[i].GetUint64());
+		}
+		return;
+	}
+
+	void BlockDevice::writeMetas() {
+
+//		writeInodeMeta
+		Document d;
+		d.SetObject();
+
+		Document::AllocatorType &allocator = d.GetAllocator();
+
+		Value freeInode(kObjectType);
+		freeInode.SetUint64(this->nextFreeInode);
+		d.AddMember(StringRef("nextFreeInode"), freeInode, allocator);
+
+		Value inodeList(kArrayType);
+		Value inode(kObjectType);
+
+		for (auto b = this->freeInodes.begin(); b != this->freeInodes.end(); b++) {
+			inode.SetUint64(*b);
+			inodeList.PushBack(Value(*b), allocator);
+		}
+
+		d.AddMember(StringRef("freeInodes"), inodeList, allocator);
+
+		StringBuffer strBuff;
+		PrettyWriter<StringBuffer> writer(strBuff);
+		d.Accept(writer);
+
+
+		string inodeFilename = this->mountpoint + "/metas/inodes.json";
+		ofstream inodeFile;
+		inodeFile.open(inodeFilename);
+		inodeFile << strBuff.GetString() << endl;
+		inodeFile.close();
+	}
+
+	void BlockDevice::logError(string message) {
+		cerr << message << endl;
+	}
+
+	bool BlockDevice::dirExists(string path) {
+		struct stat info;
+
+		if (stat(path.c_str(), &info) != 0)
+			return false;
+		else return (info.st_mode & S_IFDIR) != 0;
+	}
+
+	bool BlockDevice::createFile(string path) {
+		if (creat(path.c_str(), 0600) < 0) {
+			string message = "create " + path + " error " + string(strerror(errno)) + " [" + to_string(errno) + "]";
+			logError(message);
+			return false;
+		}
+		return true;
+	}
+
+	bool BlockDevice::deleteFile(std::string path) {
+		if (remove(path.c_str()) != 0) {
+			string message = "ERROR: deleting file " + path;
+			logError(message);
+			return false;
+		}
+		return true;
+	}
+
+	bool BlockDevice::readFile(std::string path, uint8_t *content) {
+		return false;
+	}
+
+	bool BlockDevice::writeFile(std::string path, uint8_t *content) {
+		return false;
+	}
+
 
 }  // namespace Plugin

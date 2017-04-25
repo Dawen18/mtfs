@@ -7,13 +7,22 @@
 #include <iostream>
 #include <assert.h>
 
-#include <FileStorage/Plugin.h>
+#include <PluginSystem/Plugin.h>
 #include <FileStorage/structs.h>
+#include <map>
+#include <queue>
 
 namespace PluginSystem {
 	class BlockDevice : public Plugin {
+
 	public:
-		bool init(int blockSize, std::vector<std::string> params) override;
+		BlockDevice();
+
+		std::vector<std::string> getInfos();
+
+		bool attach(std::map<std::string, std::string> params) override;
+
+		bool detach() override;
 
 		bool addInode(std::uint64_t &inodeId) override;
 
@@ -34,6 +43,32 @@ namespace PluginSystem {
 		bool readSuperblock(FileStorage::superblock_t &superblock) override;
 
 		bool writeSuperblock(FileStorage::superblock_t superblock) override;
+
+	private:
+		std::string mountpoint;
+		std::string devicePath;
+		std::string fsType;
+		int blockSize;
+		std::vector<uint64_t> freeInodes;
+		uint64_t nextFreeInode;
+
+		void initDirHierarchie();
+
+		void initInodes();
+
+		void writeMetas();
+
+		void logError(std::string message);
+
+		bool dirExists(std::string path);
+
+		bool createFile(std::string path);
+
+		bool deleteFile(std::string path);
+
+		bool readFile(std::string path, uint8_t *content);
+
+		bool writeFile(std::string path, uint8_t *content);
 	};
 
 }  // namespace Plugin

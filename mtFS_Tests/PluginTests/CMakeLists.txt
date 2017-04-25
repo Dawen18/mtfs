@@ -1,6 +1,8 @@
 include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 include_directories(../../mtFS/include)
 
-add_executable(test_tt test.cpp)
+set(BLOCK_SRCS ../../Plugin/BlockDevice/BlockDevice.h ../../Plugin/BlockDevice/BlockDevice.cpp)
+add_definitions(-DDEBUG)
+add_executable(blockTests blockDeviceTests.cpp ${BLOCK_SRCS})
 
-target_link_libraries(test_tt gtest gtest_main)
+target_link_libraries(blockTests gtest gtest_main)
