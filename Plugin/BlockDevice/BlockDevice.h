@@ -14,6 +14,9 @@
 
 namespace PluginSystem {
 	class BlockDevice : public Plugin {
+		static constexpr const char* INODES_DIR = "inodes";
+		static constexpr const char* BLOCKS_DIR = "blocks";
+		static constexpr const char* METAS_DIR = "metas";
 
 	public:
 		BlockDevice();

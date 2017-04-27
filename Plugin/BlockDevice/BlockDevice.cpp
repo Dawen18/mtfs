@@ -89,7 +89,7 @@ namespace PluginSystem {
 			this->freeInodes.erase(freeInodes.begin());
 		}
 
-		string filename = this->mountpoint + "/inodes/" + to_string(inodeId);
+		string filename = this->mountpoint + "/" + INODES_DIR + "/" + to_string(inodeId);
 
 		return createFile(filename);
 	}
@@ -101,7 +101,7 @@ namespace PluginSystem {
 			this->freeInodes.push_back(inodeId);
 		}
 
-		string filename = this->mountpoint + "/inodes/" + to_string(inodeId);
+		string filename = this->mountpoint + "/" + INODES_DIR + "/" + to_string(inodeId);
 
 		return deleteFile(filename);
 	}
@@ -111,7 +111,45 @@ namespace PluginSystem {
 	}
 
 	bool BlockDevice::writeInode(std::uint64_t inodeId, FileStorage::inode_st &inode) {
-		return false;
+		Document d;
+		d.SetObject();
+		Document::AllocatorType &alloc = d.GetAllocator();
+
+		Value v;
+
+		v.SetUint(inode.accesRight);
+		d.AddMember(StringRef("accessRight"), v, alloc);
+
+		v.SetUint(inode.uid);
+		d.AddMember(StringRef("uid"), v, alloc);
+
+		v.SetUint(inode.gid);
+		d.AddMember(StringRef("gid"), v, alloc);
+
+		v.SetUint64(inode.size);
+		d.AddMember(StringRef("size"), v, alloc);
+
+		v.SetUint(inode.linkCount);
+		d.AddMember(StringRef("linkCount"), v, alloc);
+
+		Value a(kArrayType);
+		Value o(kObjectType);
+
+		for (auto b=inode.referenceId.begin();b!=inode.referenceId.end();b++){
+			FileStorage::ident_t ident = *b;
+			v.SetUint(ident.poolId);
+		}
+
+		StringBuffer sb;
+		PrettyWriter<StringBuffer> pw(sb);
+		d.Accept(pw);
+
+		string filename = this->mountpoint + "/" + BlockDevice::INODES_DIR + "/" + to_string(inodeId);
+		ofstream inodeFile(filename);
+		inodeFile << sb.GetString() << endl;
+		inodeFile.close();
+
+		return true;
 	}
 
 	bool BlockDevice::addBlock(std::uint64_t &blockId) {
@@ -141,16 +179,16 @@ namespace PluginSystem {
 	/////////////Private method///////////////
 
 	void BlockDevice::initDirHierarchie() {
-		if (!dirExists(this->mountpoint + "/inodes"))
-			mkdir((this->mountpoint + "/inodes").c_str(), 0700);
-		if (!dirExists(this->mountpoint + "/blocks"))
-			mkdir((this->mountpoint + "/blocks").c_str(), 0700);
-		if (!dirExists(this->mountpoint + "/meta"))
-			mkdir((this->mountpoint + "/metas").c_str(), 0700);
+		if (!dirExists(this->mountpoint + "/" + BlockDevice::INODES_DIR))
+			mkdir((this->mountpoint + "/" + BlockDevice::INODES_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + "/" + BlockDevice::BLOCKS_DIR))
+			mkdir((this->mountpoint + "/" + BlockDevice::BLOCKS_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + "/" + BlockDevice::METAS_DIR))
+			mkdir((this->mountpoint + "/" + BlockDevice::METAS_DIR).c_str(), 0700);
 	}
 
 	void BlockDevice::initInodes() {
-		string inodeFilename = this->mountpoint + "/metas/inodes.json";
+		string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/inodes.json";
 		ifstream inodeFile(inodeFilename);
 		if (!inodeFile.is_open())
 			return;
@@ -201,7 +239,7 @@ namespace PluginSystem {
 		d.Accept(writer);
 
 
-		string inodeFilename = this->mountpoint + "/metas/inodes.json";
+		string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/inodes.json";
 		ofstream inodeFile;
 		inodeFile.open(inodeFilename);
 		inodeFile << strBuff.GetString() << endl;
