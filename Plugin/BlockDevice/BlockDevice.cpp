@@ -42,9 +42,17 @@ namespace PluginSystem {
 		this->blockSize = stoi(params.at("blocksize"));
 		string home;
 		home = params.at("home");
+		string parentDir = home + "BlockDevices/";
 		this->fsType = params.at("fsType");
 		this->devicePath = params.at("devicePath");
-		this->mountpoint = home + this->devicePath.substr(this->devicePath.find('/', 1) + 1);
+		this->mountpoint = parentDir + this->devicePath.substr(this->devicePath.find('/', 1) + 1);
+
+		if (!dirExists(parentDir)) {
+			if (mkdir(parentDir.c_str(), 0700) != 0) {
+				logError("mkdir error " + parentDir + " " + strerror(errno));
+				return false;
+			}
+		}
 
 		if (!dirExists(this->mountpoint)) {
 			if (mkdir(this->mountpoint.c_str(), 0700) != 0) {
@@ -133,12 +141,23 @@ namespace PluginSystem {
 		d.AddMember(StringRef("linkCount"), v, alloc);
 
 		Value a(kArrayType);
-		Value o(kObjectType);
 
-		for (auto b=inode.referenceId.begin();b!=inode.referenceId.end();b++){
+		for (auto b = inode.referenceId.begin(); b != inode.referenceId.end(); b++) {
+			Value o(kObjectType);
+
 			FileStorage::ident_t ident = *b;
 			v.SetUint(ident.poolId);
+			o.AddMember(StringRef("poolId"), v, alloc);
+			v.SetUint(ident.volumeId);
+			o.AddMember(StringRef("volumeId"), v, alloc);
+			v.SetUint64(ident.id);
+			o.AddMember(StringRef("id"), v, alloc);
+
+			a.PushBack(o, alloc);
 		}
+
+		d.AddMember(StringRef("referenceId"), a, alloc);
+
 
 		StringBuffer sb;
 		PrettyWriter<StringBuffer> pw(sb);

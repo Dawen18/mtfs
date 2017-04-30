@@ -4,13 +4,13 @@
 **/
 
 #include <gtest/gtest.h>
-#include <Plugin/BlockDevice/BlockDevice.h>
-#include <FileStorage/structs.h>
+#include <BlockDevice/BlockDevice.h>
+//#include <FileStorage/structs.h>
 
 using namespace std;
 using namespace PluginSystem;
 
-const string HOME = "/tmp/mtFS/Plugins/BlockDevices/";
+const string HOME = "/tmp/mtFS/Plugins/";
 
 TEST(BlockDevice, attachDetach) {
 #ifndef DEBUG
@@ -96,10 +96,15 @@ TEST_F(BlockDeviceFixture, writeInode) {
 	uint64_t inodeId;
 	blockDevice.addInode(inodeId);
 
-	FileStorage::ident_st rootIdent;
+	FileStorage::ident_t rootIdent;
 	rootIdent.id = 0;
 	rootIdent.poolId = 0;
 	rootIdent.volumeId = 0;
+
+	FileStorage::ident_t oIdent;
+	oIdent.id = 42;
+	oIdent.volumeId = 1;
+	oIdent.poolId = 1;
 
 	FileStorage::inode_st ino;
 	ino.accesRight = 0666;
@@ -108,6 +113,7 @@ TEST_F(BlockDeviceFixture, writeInode) {
 	ino.size = 1024;
 	ino.linkCount = 1;
 	ino.referenceId.push_back(rootIdent);
+	ino.referenceId.push_back(oIdent);
 	ino.access.push_back((unsigned long &&) time(nullptr));
 
 	cout << "write inode " << inodeId << endl;
