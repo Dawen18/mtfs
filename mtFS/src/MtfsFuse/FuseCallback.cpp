@@ -100,26 +100,43 @@ namespace MtfsFuse {
 		ops.flock = FuseCallback::flock;
 		ops.fallocate = FuseCallback::fallocate;
 		ops.readdirplus = FuseCallback::readdirplus;
+
+		this->base = 0;
 		return;
 	}
 
 	FuseCallback *FuseCallback::getInstance() {
-		return nullptr;
+		if (!self)
+			self = new FuseCallback();
+
+		return self;
 	}
 
 	void FuseCallback::setBase(FuseBase *base) {
+		this->base = base;
+
 		return;
 	}
 
 	void FuseCallback::init(void *userdata, struct fuse_conn_info *conn) {
+		if (base)
+			base->init(userdata, conn);
+
 		return;
 	}
 
 	void FuseCallback::destroy(void *userdata) {
+		if (base)
+			base->destroy(userdata);
+
 		return;
 	}
 
 	void FuseCallback::lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
+		if (base)
+			base->lookup(req,parent,name);
+		else
+			fuse_reply_err(req, ENOSYS);
 		return;
 	}
 
