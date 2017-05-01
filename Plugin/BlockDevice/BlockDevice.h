@@ -14,14 +14,14 @@
 
 namespace PluginSystem {
 	class BlockDevice : public Plugin {
-		static constexpr const char* INODES_DIR = "inodes";
-		static constexpr const char* BLOCKS_DIR = "blocks";
-		static constexpr const char* METAS_DIR = "metas";
+		static constexpr const char *INODES_DIR = "inodes";
+		static constexpr const char *BLOCKS_DIR = "blocks";
+		static constexpr const char *METAS_DIR = "metas";
 
 	public:
 		BlockDevice();
 
-		std::vector<std::string> getInfos();
+		std::vector<std::string> getInfos() override;
 
 		bool attach(std::map<std::string, std::string> params) override;
 
@@ -69,9 +69,6 @@ namespace PluginSystem {
 
 		bool deleteFile(std::string path);
 
-		bool readFile(std::string path, uint8_t *content);
-
-		bool writeFile(std::string path, uint8_t *content);
 	};
 
 }  // namespace Plugin

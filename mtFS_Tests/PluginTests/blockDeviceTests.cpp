@@ -31,6 +31,9 @@ TEST(BlockDevice, attachDetach) {
 class BlockDeviceFixture : public ::testing::Test {
 public:
 	BlockDeviceFixture() {
+		rootIdent.poolId = 0;
+		rootIdent.volumeId = 0;
+		rootIdent.id = 0;
 	}
 
 	virtual void SetUp() {
@@ -50,6 +53,7 @@ public:
 	}
 
 	BlockDevice blockDevice;
+	FileStorage::ident_t rootIdent;
 
 };
 
@@ -96,17 +100,12 @@ TEST_F(BlockDeviceFixture, writeInode) {
 	uint64_t inodeId;
 	blockDevice.addInode(inodeId);
 
-	FileStorage::ident_t rootIdent;
-	rootIdent.id = 0;
-	rootIdent.poolId = 0;
-	rootIdent.volumeId = 0;
-
 	FileStorage::ident_t oIdent;
 	oIdent.id = 42;
 	oIdent.volumeId = 1;
 	oIdent.poolId = 1;
 
-	FileStorage::inode_st ino;
+	FileStorage::inode_t ino;
 	ino.accesRight = 0666;
 	ino.uid = 0;
 	ino.gid = 0;
@@ -116,8 +115,63 @@ TEST_F(BlockDeviceFixture, writeInode) {
 	ino.referenceId.push_back(oIdent);
 	ino.access.push_back((unsigned long &&) time(nullptr));
 
-	cout << "write inode " << inodeId << endl;
+	for (int i = 0; i < 4; ++i) {
+		vector<FileStorage::ident_t> blocks;
+
+		for (uint j = 0; j < 3; ++j) {
+			FileStorage::ident_t ident = {
+					.poolId = 1,
+					.volumeId = j,
+					.id = i * 3 + j,
+			};
+
+			blocks.push_back(ident);
+		}
+		ino.dataBlocks.push_back(blocks);
+	}
+
 	ASSERT_TRUE(blockDevice.writeInode(inodeId, ino));
+}
+
+TEST_F(BlockDeviceFixture, readInode) {
+	FileStorage::inode_t original, inode;
+	memset(&original, 0, sizeof(FileStorage::inode_t));
+	memset(&inode, 0, sizeof(FileStorage::inode_t));
+
+	original.accesRight = 0644;
+	original.uid = 1;
+	original.gid = 1;
+	original.size = 1024;
+	original.linkCount = 1;
+	original.referenceId.push_back(rootIdent);
+	original.access.push_back((unsigned long &&) time(nullptr));
+
+	for (int i = 0; i < 4; ++i) {
+		vector<FileStorage::ident_t> blocks;
+
+		for (uint j = 0; j < 3; ++j) {
+			FileStorage::ident_t ident = {
+					.poolId = 1,
+					.volumeId = j,
+					.id = i * 3 + j,
+			};
+
+			blocks.push_back(ident);
+		}
+		original.dataBlocks.push_back(blocks);
+	}
+
+	uint64_t inodeId;
+	blockDevice.addInode(inodeId);
+	cout << "inodeId " << inodeId << "  " << endl;
+	blockDevice.writeInode(inodeId, original);
+	ASSERT_TRUE(blockDevice.readInode(inodeId, inode));
+
+//	cout << original.accesRight << " " << inode.accesRight << endl;
+	ASSERT_EQ(original, inode);
+	original.size = 2048;
+	blockDevice.writeInode(inodeId, original);
+	ASSERT_TRUE(blockDevice.readInode(inodeId, inode));
 }
 
 int main(int argc, char **argv) {

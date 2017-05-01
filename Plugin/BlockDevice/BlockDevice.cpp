@@ -4,8 +4,6 @@
 #include <iostream>
 #include <sys/mount.h>
 #include <map>
-#include <zconf.h>
-#include <cstring>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <rapidjson/document.h>
@@ -19,6 +17,7 @@
 
 using namespace std;
 using namespace rapidjson;
+using namespace FileStorage;
 
 namespace PluginSystem {
 	BlockDevice::BlockDevice() {
@@ -115,7 +114,75 @@ namespace PluginSystem {
 	}
 
 	bool BlockDevice::readInode(std::uint64_t inodeId, FileStorage::inode_st &inode) {
-		return false;
+		string filename = this->mountpoint + "/" + INODES_DIR + "/" + to_string(inodeId);
+		ifstream file(filename);
+		if (!file.is_open())
+			return false;
+
+		IStreamWrapper wrapper(file);
+
+		Document d;
+		d.ParseStream(wrapper);
+
+		assert(d.IsObject());
+		assert(d.HasMember("accessRight"));
+		assert(d.HasMember("uid"));
+		assert(d.HasMember("gid"));
+		assert(d.HasMember("size"));
+		assert(d.HasMember("linkCount"));
+		assert(d.HasMember("referenceId"));
+		assert(d.HasMember("dataBlocks"));
+
+		inode.accesRight = (uint16_t) d["accessRight"].GetUint();
+		inode.uid = (uint16_t) d["uid"].GetUint();
+		inode.gid = (uint16_t) d["gid"].GetUint();
+		inode.size = d["size"].GetUint64();
+		inode.linkCount = (uint8_t) d["linkCount"].GetUint();
+
+		const Value &referenceArray = d["referenceId"];
+		assert(referenceArray.IsArray());
+		inode.referenceId.clear();
+		for (auto &v : referenceArray.GetArray()) {
+			ident_t ident;
+
+			assert(v.IsObject());
+			assert(v.HasMember("poolId"));
+			assert(v.HasMember("volumeId"));
+			assert(v.HasMember("id"));
+
+			ident.poolId = (uint16_t) v["poolId"].GetUint();
+			ident.volumeId = (uint16_t) v["volumeId"].GetUint();
+			ident.id = v["id"].GetUint64();
+
+			inode.referenceId.push_back(ident);
+		}
+
+		const Value &dataArray = d["dataBlocks"];
+		assert(dataArray.IsArray());
+		inode.dataBlocks.clear();
+		for (auto &a : dataArray.GetArray()){
+			vector<ident_t> redundancy;
+
+			assert(a.IsArray());
+			for (auto &v : a.GetArray()){
+				ident_t ident;
+
+				assert(v.IsObject());
+				assert(v.HasMember("poolId"));
+				assert(v.HasMember("volumeId"));
+				assert(v.HasMember("id"));
+
+				ident.poolId = (uint16_t) v["poolId"].GetUint();
+				ident.volumeId = (uint16_t) v["volumeId"].GetUint();
+				ident.id = v["id"].GetUint64();
+
+				redundancy.push_back(ident);
+			}
+
+			inode.dataBlocks.push_back(redundancy);
+		}
+
+		return true;
 	}
 
 	bool BlockDevice::writeInode(std::uint64_t inodeId, FileStorage::inode_st &inode) {
@@ -158,6 +225,29 @@ namespace PluginSystem {
 
 		d.AddMember(StringRef("referenceId"), a, alloc);
 
+		Value ba(kArrayType);
+		for (auto b = inode.dataBlocks.begin(); b != inode.dataBlocks.end(); b++) {
+			vector<ident_t> redondancy = *b;
+			Value ra(kArrayType);
+			for (auto be = redondancy.begin(); be != redondancy.end(); be++) {
+				Value ids(kObjectType);
+
+				ident_t ident = *be;
+				v.SetUint(ident.poolId);
+				ids.AddMember(StringRef("poolId"), v, alloc);
+				v.SetUint(ident.volumeId);
+				ids.AddMember(StringRef("volumeId"), v, alloc);
+				v.SetUint64(ident.id);
+				ids.AddMember(StringRef("id"), v, alloc);
+
+				ra.PushBack(ids, alloc);
+			}
+
+			ba.PushBack(ra, alloc);
+		}
+
+		d.AddMember(StringRef("dataBlocks"), ba, alloc);
+
 
 		StringBuffer sb;
 		PrettyWriter<StringBuffer> pw(sb);
@@ -176,6 +266,7 @@ namespace PluginSystem {
 	}
 
 	bool BlockDevice::delBlock(std::uint64_t blockId) {
+		(void) blockId;
 		return false;
 	}
 
@@ -293,14 +384,6 @@ namespace PluginSystem {
 			return false;
 		}
 		return true;
-	}
-
-	bool BlockDevice::readFile(std::string path, uint8_t *content) {
-		return false;
-	}
-
-	bool BlockDevice::writeFile(std::string path, uint8_t *content) {
-		return false;
 	}
 
 
