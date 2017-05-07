@@ -79,11 +79,27 @@ namespace FileStorage {
 	typedef struct superblock_st {
 	} superblock_t;
 
-	typedef struct block_st {
-		ident_t id;
-		ident_t reversePointer;
+	typedef struct blockInfo_st {
+		ident_st referenceId;
+
 		std::vector<uint64_t> lastAccess;
-	} block_t;
+
+	} blockInfo_t;
+
+	typedef struct ruleInfo_st {
+		uint16_t uid;
+
+		uint16_t gid;
+
+		uint64_t previousAccess;
+
+	} ruleInfo_t;
+
+	typedef struct move_st {
+		ident_t previousId;
+		ident_t newId;
+	} move_t;
+
 }  // namespace mtFS
 
 #endif //TRAVAIL_BACHELOR_STRUCTS_H

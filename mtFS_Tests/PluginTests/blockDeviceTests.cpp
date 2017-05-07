@@ -10,7 +10,7 @@
 using namespace std;
 using namespace PluginSystem;
 
-const string HOME = "/tmp/mtFS/Plugins/";
+const string HOME = "/home/david/Cours/4eme/Travail_bachelor/Home/Plugins/";
 
 TEST(BlockDevice, attachDetach) {
 #ifndef DEBUG

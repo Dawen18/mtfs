@@ -6,7 +6,6 @@
 #include <vector>
 #include <list>
 #include <iostream>
-#include <assert.h>
 
 #include "MtfsFuse/FuseBase.h"
 
@@ -16,7 +15,7 @@ namespace MtfsFuse {
 
 	class FuseCallback {
 	public:
-		FuseCallback *getInstance();
+		static FuseCallback *getInstance();
 
 		void setBase(FuseBase *base);
 
@@ -102,7 +101,7 @@ namespace MtfsFuse {
 		ioctl(fuse_req_t req, fuse_ino_t ino, int cmd, void *arg, struct fuse_file_info *fi, unsigned int flags,
 			  const void *in_buf, std::size_t in_bufsz, std::size_t out_bufsz);
 
-		static void poll(fuse_req_t rer, fuse_ino_t ino, struct fuse_file_info *fi, struct fuse_pollhandle *ph);
+		static void poll(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct fuse_pollhandle *ph);
 
 		static void
 		write_buf(fuse_req_t req, fuse_ino_t ino, struct fuse_bufvec *bufv, off_t off, struct fuse_file_info *fi);

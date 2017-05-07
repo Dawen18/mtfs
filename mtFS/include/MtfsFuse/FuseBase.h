@@ -27,13 +27,15 @@ namespace MtfsFuse {
 	protected:
 		friend class FuseCallback;
 
+		virtual bool runPrepare(int argc, char **argv)=0;
+
 		virtual void init(void *userdata, fuse_conn_info *conn)=0;
 
 		virtual void destroy(void *userdata)=0;
 
 		virtual void lookup(fuse_req_t req, fuse_ino_t parent, const char *name)=0;
 
-		virtual void forget(fuse_req_t req, fuse_ino_t ino, std::uint64_t nlookup)=0;
+		virtual void forget(fuse_req_t req, fuse_ino_t ino, uint64_t nlookup)=0;
 
 		virtual void getAttr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi)=0;
 
@@ -59,10 +61,10 @@ namespace MtfsFuse {
 
 		virtual void open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi)=0;
 
-		virtual void read(fuse_req_t req, fuse_ino_t ino, std::size_t size, off_t off, fuse_file_info *fi)=0;
+		virtual void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi)=0;
 
 		virtual void
-		write(fuse_req_t req, fuse_ino_t ino, const char *buf, std::size_t size, off_t off, fuse_file_info *fi)=0;
+		write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off_t off, fuse_file_info *fi)=0;
 
 		virtual void flush(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi)=0;
 
@@ -72,7 +74,7 @@ namespace MtfsFuse {
 
 		virtual void opendir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi)=0;
 
-		virtual void readdir(fuse_req_t req, fuse_ino_t ino, std::size_t size, off_t off, fuse_file_info *fi)=0;
+		virtual void readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi)=0;
 
 		virtual void releasedir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi)=0;
 
@@ -81,11 +83,11 @@ namespace MtfsFuse {
 		virtual void statfs(fuse_req_t req, fuse_ino_t ino)=0;
 
 		virtual void
-		setxattr(fuse_req_t req, fuse_ino_t ino, const char *name, const char *value, std::size_t size, int flags)=0;
+		setxattr(fuse_req_t req, fuse_ino_t ino, const char *name, const char *value, size_t size, int flags)=0;
 
-		virtual void getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, std::size_t size)=0;
+		virtual void getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, size_t size)=0;
 
-		virtual void listxattr(fuse_req_t req, fuse_ino_t ino, std::size_t size)=0;
+		virtual void listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)=0;
 
 		virtual void removexattr(fuse_req_t req, fuse_ino_t ino, const char *name)=0;
 
@@ -93,14 +95,14 @@ namespace MtfsFuse {
 
 		virtual void create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode, fuse_file_info *fi)=0;
 
-		virtual void getlk(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi, flock *lock)=0;
+		virtual void getlk(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi, struct flock *lock)=0;
 
-		virtual void setlk(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi, flock *lock, int sleep)=0;
+		virtual void setlk(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi, struct flock *lock, int sleep)=0;
 
-		virtual void bmap(fuse_req_t req, fuse_ino_t ino, std::size_t blocksize, std::uint64_t idx)=0;
+		virtual void bmap(fuse_req_t req, fuse_ino_t ino, size_t blocksize, uint64_t idx)=0;
 
 		virtual void ioctl(fuse_req_t req, fuse_ino_t ino, int cmd, void *arg, fuse_file_info *fi, unsigned int flags,
-						   const void *in_buf, std::size_t in_bufsz, std::size_t out_bufsz)=0;
+						   const void *in_buf, size_t in_bufsz, size_t out_bufsz)=0;
 
 		virtual void poll(fuse_req_t rer, fuse_ino_t ino, fuse_file_info *fi, fuse_pollhandle *ph)=0;
 
@@ -108,14 +110,14 @@ namespace MtfsFuse {
 
 		virtual void retrive_reply(fuse_req_t req, void *cookie, fuse_ino_t ino, off_t offset, fuse_bufvec *bufv)=0;
 
-		virtual void forget_multi(fuse_req_t req, std::size_t count, fuse_forget_data *forgets)=0;
+		virtual void forget_multi(fuse_req_t req, size_t count, fuse_forget_data *forgets)=0;
 
 		virtual void flock(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi, int op)=0;
 
 		virtual void
 		fallocate(fuse_req_t req, fuse_ino_t ino, int mode, off_t offset, off_t length, fuse_file_info *fi)=0;
 
-		virtual void readdirplus(fuse_req_t req, fuse_ino_t ino, std::size_t size, off_t off, fuse_file_info *fi)=0;
+		virtual void readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi)=0;
 
 	private:
 		FuseCallback *callbacks;

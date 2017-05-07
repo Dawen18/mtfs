@@ -4,6 +4,7 @@ project(mtFS)
 set(CMAKE_CXX_STANDARD 14)
 
 include_directories(library)
+include_directories(mtFS/include)
 
 add_subdirectory(mtFS)
 add_subdirectory(mtFS_Tests)
