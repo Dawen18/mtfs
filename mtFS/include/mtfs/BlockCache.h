@@ -6,15 +6,15 @@
 #include <list>
 #include <iostream>
 #include <assert.h>
-#include <FileStorage/structs.h>
+#include <mtfs/structs.h>
 
 
-namespace FileStorage {
+namespace mtfs {
 	class BlockCache {
 	public:
 		virtual bool replaceBlock(ident_t blockId, uint8_t *block)=0;
 
 	};
 
-}  // namespace FileStorage
+}  // namespace mtfs
 #endif

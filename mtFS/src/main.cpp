@@ -11,7 +11,7 @@
 #define FUSE_USE_VERSION 30
 
 using namespace std;
-using namespace FileStorage;
+using namespace mtfs;
 
 void th1(int i) {
 	int loc = 0;
@@ -25,7 +25,7 @@ void th1(int i) {
 
 int main(int argc, char **argv) {
 
-	Mtfs *mtfs = Mtfs::getInstance();
+	Mtfs *mtfs = mtfs::getInstance();
 
 	mtfs->start();
 	mtfs->join();

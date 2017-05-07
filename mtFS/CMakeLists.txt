@@ -1,20 +1,20 @@
 
 set(FS_HEAD
-		include/FileStorage/BlockAccess.h
-		include/FileStorage/BlockCache.h
-		include/FileStorage/Cache.h
-		include/FileStorage/DirectoryEntryAccess.h
-		include/FileStorage/DirectoryEntryCache.h
-		include/FileStorage/InodeAcces.h
-		include/FileStorage/InodeCache.h
-		include/FileStorage/Mtfs.h
-		include/FileStorage/Pool.h
-		include/FileStorage/PoolManager.h
-		include/FileStorage/Rule.h
-		include/FileStorage/structs.h
-		include/FileStorage/TimeRule.h
-		include/FileStorage/UserRightRule.h
-		include/FileStorage/Volume.h
+		include/mtfs/BlockAccess.h
+		include/mtfs/BlockCache.h
+		include/mtfs/Cache.h
+		include/mtfs/DirectoryEntryAccess.h
+		include/mtfs/DirectoryEntryCache.h
+		include/mtfs/InodeAcces.h
+		include/mtfs/InodeCache.h
+		include/mtfs/Mtfs.h
+		include/mtfs/Pool.h
+		include/mtfs/PoolManager.h
+		include/mtfs/Rule.h
+		include/mtfs/structs.h
+		include/mtfs/TimeRule.h
+		include/mtfs/UserRightRule.h
+		include/mtfs/Volume.h
 		)
 
 set(FS_SRC
@@ -40,10 +40,13 @@ set(MTFUSE_SRC
 
 set(CONF_HEAD
 		include/Configurator/ConfigFile.h
+		include/Configurator/PluginManager.h
 		)
 
 set(CONF_SRC
-		src/Configurator/ConfigFile.cpp)
+		src/Configurator/ConfigFile.cpp
+		src/Configurator/PluginManager.cpp
+		)
 
 add_executable(mtfsCreate ${MTFUSE_SRC} ${MTFUSE_HEAD} ${FS_HEAD} ${FS_SRC} src/main.cpp)
 target_link_libraries(mtfsCreate fuse3 pthread)

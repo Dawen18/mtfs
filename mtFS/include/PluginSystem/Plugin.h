@@ -7,7 +7,7 @@
 #include <iostream>
 #include <assert.h>
 
-#include <FileStorage/structs.h>
+#include <mtfs/structs.h>
 #include <map>
 
 namespace PluginSystem {
@@ -23,9 +23,9 @@ namespace PluginSystem {
 
 		virtual bool delInode(std::uint64_t inodeId)=0;
 
-		virtual bool readInode(std::uint64_t inodeId, FileStorage::inode_st &inode)=0;
+		virtual bool readInode(std::uint64_t inodeId, mtfs::inode_st &inode)=0;
 
-		virtual bool writeInode(std::uint64_t inodeId, FileStorage::inode_st &inode)=0;
+		virtual bool writeInode(std::uint64_t inodeId, mtfs::inode_st &inode)=0;
 
 		virtual bool addBlock(std::uint64_t &blockId)=0;
 
@@ -35,9 +35,9 @@ namespace PluginSystem {
 
 		virtual bool writeBlock(std::uint64_t blockId, std::uint8_t *buffe)=0;
 
-		virtual bool readSuperblock(FileStorage::superblock_t &superblock)=0;
+		virtual bool readSuperblock(mtfs::superblock_t &superblock)=0;
 
-		virtual bool writeSuperblock(FileStorage::superblock_t superblock)=0;
+		virtual bool writeSuperblock(mtfs::superblock_t &superblock)=0;
 
 	};
 

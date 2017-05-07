@@ -6,14 +6,14 @@
 #include <list>
 #include <iostream>
 #include <assert.h>
-#include <FileStorage/structs.h>
+#include <mtfs/structs.h>
 
-namespace FileStorage {
+namespace mtfs {
 	class Rule {
 	public:
 		virtual bool satisfyRules(ruleInfo_st info)=0;
 
 	};
 
-}  // namespace FileStorage
+}  // namespace mtfs
 #endif

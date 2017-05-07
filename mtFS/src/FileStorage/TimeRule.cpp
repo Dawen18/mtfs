@@ -4,9 +4,12 @@
 #include <iostream>
 #include <assert.h>
 
-#include "FileStorage/TimeRule.h"
+#include "mtfs/TimeRule.h"
 
-namespace FileStorage {
+namespace mtfs {
+	TimeRule::TimeRule(uint64_t lowerLimit, uint64_t higerLimit) : lowerLimit(lowerLimit), higerLimit(higerLimit) {}
 
-
-}  // namespace FileStorage
+	bool TimeRule::satisfyRules(ruleInfo_st info) {
+		return false;
+	}
+}  // namespace mtfs

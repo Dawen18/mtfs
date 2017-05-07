@@ -1,14 +1,10 @@
-#include <string>
-#include <vector>
-#include <list>
-#include <iostream>
-#include <assert.h>
-
-#include "FileStorage/Volume.h"
+#include "mtfs/Volume.h"
 
 using namespace std;
 
-namespace FileStorage {
+namespace mtfs {
+
+	Volume::Volume(PluginSystem::Plugin *plugin) : plugin(plugin) {}
 
 	bool Volume::setTimeLimits(int low, int high) {
 		return false;
@@ -47,4 +43,56 @@ namespace FileStorage {
 	bool Volume::uptadeLastAcces(uint64_t id, std::map<uint64_t, std::vector<uint64_t>> map) {
 		return false;
 	}
-}  // namespace FileStorage
+
+	vector<string> Volume::getInfos() {
+		return plugin->getInfos();
+	}
+
+	bool Volume::attach(std::map<std::string, std::string> params) {
+		return plugin->attach(params);
+	}
+
+	bool Volume::detach() {
+		return plugin->detach();
+	}
+
+	bool Volume::addInode(std::uint64_t &inodeId) {
+		return plugin->addInode(inodeId);
+	}
+
+	bool Volume::delInode(std::uint64_t inodeId) {
+		return plugin->delInode(inodeId);
+	}
+
+	bool Volume::readInode(std::uint64_t inodeId, mtfs::inode_st &inode) {
+		return plugin->readInode(inodeId, inode);
+	}
+
+	bool Volume::writeInode(std::uint64_t inodeId, mtfs::inode_st &inode) {
+		return plugin->writeInode(inodeId, inode);
+	}
+
+	bool Volume::addBlock(std::uint64_t &blockId) {
+		return plugin->addBlock(blockId);
+	}
+
+	bool Volume::delBlock(std::uint64_t blockId) {
+		return plugin->delBlock(blockId);
+	}
+
+	bool Volume::readBlock(std::uint64_t blockId, std::uint8_t *buffer) {
+		return plugin->readBlock(blockId, buffer);
+	}
+
+	bool Volume::writeBlock(std::uint64_t blockId, std::uint8_t *buffer) {
+		return plugin->writeBlock(blockId, buffer);
+	}
+
+	bool Volume::readSuperblock(mtfs::superblock_t &superblock) {
+		return plugin->readSuperblock(superblock);
+	}
+
+	bool Volume::writeSuperblock(superblock_t &superblock) {
+		return plugin->writeSuperblock(superblock);
+	}
+}  // namespace mtfs

@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 #include <BlockDevice/BlockDevice.h>
-//#include <FileStorage/structs.h>
+//#include <mtfs/structs.h>
 
 using namespace std;
 using namespace PluginSystem;
@@ -53,7 +53,7 @@ public:
 	}
 
 	BlockDevice blockDevice;
-	FileStorage::ident_t rootIdent;
+	mtfs::ident_t rootIdent;
 
 };
 
@@ -100,12 +100,12 @@ TEST_F(BlockDeviceFixture, writeInode) {
 	uint64_t inodeId;
 	blockDevice.addInode(inodeId);
 
-	FileStorage::ident_t oIdent;
+	mtfs::ident_t oIdent;
 	oIdent.id = 42;
 	oIdent.volumeId = 1;
 	oIdent.poolId = 1;
 
-	FileStorage::inode_t ino;
+	mtfs::inode_t ino;
 	ino.accesRight = 0666;
 	ino.uid = 0;
 	ino.gid = 0;
@@ -116,10 +116,10 @@ TEST_F(BlockDeviceFixture, writeInode) {
 	ino.access.push_back((unsigned long &&) time(nullptr));
 
 	for (int i = 0; i < 4; ++i) {
-		vector<FileStorage::ident_t> blocks;
+		vector<mtfs::ident_t> blocks;
 
 		for (uint j = 0; j < 3; ++j) {
-			FileStorage::ident_t ident = {
+			mtfs::ident_t ident = {
 					.poolId = 1,
 					.volumeId = j,
 					.id = i * 3 + j,
@@ -134,9 +134,9 @@ TEST_F(BlockDeviceFixture, writeInode) {
 }
 
 TEST_F(BlockDeviceFixture, readInode) {
-	FileStorage::inode_t original, inode;
-	memset(&original, 0, sizeof(FileStorage::inode_t));
-	memset(&inode, 0, sizeof(FileStorage::inode_t));
+	mtfs::inode_t original, inode;
+	memset(&original, 0, sizeof(mtfs::inode_t));
+	memset(&inode, 0, sizeof(mtfs::inode_t));
 
 	original.accesRight = 0644;
 	original.uid = 1;
@@ -147,10 +147,10 @@ TEST_F(BlockDeviceFixture, readInode) {
 	original.access.push_back((unsigned long &&) time(nullptr));
 
 	for (int i = 0; i < 4; ++i) {
-		vector<FileStorage::ident_t> blocks;
+		vector<mtfs::ident_t> blocks;
 
 		for (uint j = 0; j < 3; ++j) {
-			FileStorage::ident_t ident = {
+			mtfs::ident_t ident = {
 					.poolId = 1,
 					.volumeId = j,
 					.id = i * 3 + j,

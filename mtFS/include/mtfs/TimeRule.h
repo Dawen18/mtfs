@@ -7,16 +7,21 @@
 #include <iostream>
 #include <assert.h>
 
-#include "FileStorage/Rule.h"
+#include "mtfs/Rule.h"
 
-namespace FileStorage {
+namespace mtfs {
 	class TimeRule : public Rule {
 	private:
 		uint64_t lowerLimit;
 
 		uint64_t higerLimit;
 
+	public:
+		TimeRule(uint64_t lowerLimit, uint64_t higerLimit);
+
+		bool satisfyRules(ruleInfo_st info) override;
+
 	};
 
-}  // namespace FileStorage
+}  // namespace mtfs
 #endif

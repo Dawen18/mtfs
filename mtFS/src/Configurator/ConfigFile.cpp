@@ -2,12 +2,12 @@
 #include <iostream>
 #include "Configurator/ConfigFile.h"
 #include "../../../Plugin/BlockDevice/BlockDevice.h"
-#include <FileStorage/Mtfs.h>
+#include <mtfs/Mtfs.h>
 
 namespace Configurator {
 	using namespace std;
 	using namespace rapidjson;
-	using namespace FileStorage;
+	using namespace mtfs;
 
 	ConfigFile::ConfigFile(const Document &d) : d(d) {
 		loadPlugins();
@@ -29,33 +29,34 @@ namespace Configurator {
 
 	bool ConfigFile::validateFile() {
 		if (!d.IsObject())
-			return false;
+			throw invalid_argument("Not a object!");
+
 		if (!d.HasMember(INODE_CACHE))
-			return false;
+			throw invalid_argument("Inode cache missing!");
 
 		if (!d.HasMember(DIR_CACHE))
-			return false;
+			throw invalid_argument("Directory cache missing!");
 
 		if (!d.HasMember(BLOCK_CACHE))
-			return false;
+			throw invalid_argument("Block cache missing!");
 
 		if (!d.HasMember(BLOCK_SIZE))
-			return false;
+			throw invalid_argument("Block size missing!");
 
 		if (!d.HasMember(REDUNDANCY))
-			return false;
+			throw invalid_argument("Redundancy missing!");
 
 		if (!d.HasMember(POOLS))
-			return false;
+			throw invalid_argument("Pools missing!");
 		if (!d[POOLS].IsObject())
-			return false;
+			throw invalid_argument("Pool is not a object!");
 
 		int migration = -1;
 		if (d[POOLS].MemberCount() <= 0)
-			return false;
+			throw invalid_argument("Number of pool invalid!");
 		else if (d[POOLS].MemberCount() != 1) {
 			if (!d.HasMember(MIGRATION))
-				return false;
+				throw invalid_argument("Migration missing!");
 
 			migration = d[MIGRATION].GetInt();
 		}
@@ -75,10 +76,10 @@ namespace Configurator {
 			}
 
 			if (!validRules)
-				return false;
+				throw invalid_argument(string("Rules invalid for pool '") + m.name.GetString() + "'");
 
 			if (!validatePool(m.value))
-				return false;
+				throw invalid_argument(string("Pool '") + m.name.GetString() + "' invalid!");
 		}
 
 		return true;
@@ -95,16 +96,16 @@ namespace Configurator {
 
 	bool ConfigFile::validatePool(const rapidjson::Value &pool) {
 		if (!pool.HasMember(VOLUMES))
-			return false;
+			throw invalid_argument("Volumes missing!");
 		if (!pool[VOLUMES].IsObject())
-			return false;
+			throw invalid_argument("Volue is not a object");
 
 		int migration = -1;
 		if (pool[VOLUMES].MemberCount() <= 0)
-			return false;
+			throw invalid_argument("Number of volumes invalid!");
 		else if (pool[VOLUMES].MemberCount() != 1) {
 			if (!pool.HasMember(MIGRATION))
-				return false;
+				throw invalid_argument("Migration missing!");
 
 			migration = pool[MIGRATION].GetInt();
 		}
@@ -124,10 +125,10 @@ namespace Configurator {
 			}
 
 			if (!validRules)
-				return false;
+				throw invalid_argument(string("Rules invalid for volume '") + m.name.GetString() + "'!");
 
 			if (!validateVolume(m.value))
-				return false;
+				throw invalid_argument(string("Volume '")+m.name.GetString()+"' invalid!");
 		}
 
 		return true;

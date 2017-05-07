@@ -7,15 +7,15 @@
 #include <iostream>
 #include <assert.h>
 
-#include "FileStorage/DirectoryEntryAccess.h"
-#include "FileStorage/InodeCache.h"
-#include "FileStorage/InodeAcces.h"
-#include "FileStorage/BlockAccess.h"
-#include "FileStorage/BlockCache.h"
-#include "FileStorage/DirectoryEntryCache.h"
-#include "FileStorage/PoolManager.h"
+#include "mtfs/DirectoryEntryAccess.h"
+#include "mtfs/DirectoryEntryCache.h"
+#include "mtfs/InodeAcces.h"
+#include "mtfs/InodeCache.h"
+#include "mtfs/BlockAccess.h"
+#include "mtfs/BlockCache.h"
+#include "mtfs/PoolManager.h"
 
-namespace FileStorage {
+namespace mtfs {
 	class Cache
 			: public DirectoryEntryAccess,
 			  public InodeCache,
@@ -34,5 +34,5 @@ namespace FileStorage {
 
 	};
 
-}  // namespace FileStorage
+}  // namespace mtfs
 #endif

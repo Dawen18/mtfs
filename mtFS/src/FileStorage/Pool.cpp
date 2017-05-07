@@ -1,14 +1,18 @@
-#include <string>
-#include <vector>
-#include <list>
-#include <iostream>
-#include <assert.h>
-
-#include "FileStorage/Pool.h"
+#include "mtfs/Pool.h"
 
 using namespace std;
 
-namespace FileStorage {
+namespace mtfs {
+
+	int Pool::addVolume(uint32_t volumeId, Volume *volume, Rule *rule) {
+		if (this->volumes.find(volumeId) == this->volumes.end() && this->rules.find(volumeId) == this->rules.end())
+			return VOLUME_ID_EXIST;
+
+		this->volumes[volumeId] = volume;
+		this->rules[volumeId] = rule;
+
+		return 0;
+	}
 
 	bool Pool::addBlock(ruleInfo_t &info, uint16_t &volumeId, uint64_t &blockId) {
 		return false;
@@ -64,4 +68,4 @@ namespace FileStorage {
 	bool Pool::chooseVolume(ruleInfo_t &info, PluginSystem::Plugin *volume) {
 		return false;
 	}
-}  // namespace FileStorage
+}  // namespace mtfs

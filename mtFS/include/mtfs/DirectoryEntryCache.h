@@ -6,14 +6,14 @@
 #include <list>
 #include <iostream>
 #include <assert.h>
-#include <FileStorage/structs.h>
+#include <mtfs/structs.h>
 
-namespace FileStorage {
+namespace mtfs {
 	class DirectoryEntryCache {
 	public:
 		virtual bool replaceDirEntry(ident_st inodeId, int blockNb, uint8_t *block)=0;
 
 	};
 
-}  // namespace FileStorage
+}  // namespace mtfs
 #endif

@@ -6,7 +6,7 @@
 #ifndef TRAVAIL_BACHELOR_STRUCTS_H
 #define TRAVAIL_BACHELOR_STRUCTS_H
 
-namespace FileStorage {
+namespace mtfs {
 	typedef struct ident_st {
 		std::uint32_t poolId;
 		std::uint32_t volumeId;
@@ -23,8 +23,8 @@ namespace FileStorage {
 
 	typedef struct inode_st {
 		uint16_t accesRight;
-		uint16_t uid;
-		uint16_t gid;
+		uid_t uid;
+		gid_t gid;
 		uint64_t size;
 		uint8_t linkCount;
 		std::vector<std::uint64_t> access;
@@ -54,7 +54,7 @@ namespace FileStorage {
 			}
 
 			if (dataBlocks.size() != rhs.dataBlocks.size()) {
-				std::cout << "size differ " << dataBlocks.size() << " " << rhs.dataBlocks.size() << std::endl;
+//				std::cout << "size differ " << dataBlocks.size() << " " << rhs.dataBlocks.size() << std::endl;
 				return false;
 			}
 			for (auto lIter = dataBlocks.begin(), rIter = rhs.dataBlocks.begin();

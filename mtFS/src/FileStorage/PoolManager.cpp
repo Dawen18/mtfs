@@ -1,12 +1,6 @@
-#include <string>
-#include <vector>
-#include <list>
-#include <iostream>
-#include <assert.h>
+#include "mtfs/PoolManager.h"
 
-#include "FileStorage/PoolManager.h"
-
-namespace FileStorage {
+namespace mtfs {
 
 	ident_t PoolManager::addBlockToEnd(inode_t inode) {
 		ident_t ident;
@@ -20,4 +14,64 @@ namespace FileStorage {
 	bool PoolManager::choosePool(ruleInfo_t info, Pool *pool) {
 		return false;
 	}
-}  // namespace FileStorage
+
+	bool PoolManager::addBlock(inode_st &inode) {
+		return false;
+	}
+
+	bool PoolManager::delBlock(inode_st &inode) {
+		return false;
+	}
+
+	bool PoolManager::getBlock(inode_st &inode, int blockNumber, uint8_t *buffer) {
+		return false;
+	}
+
+	bool PoolManager::setBlock(inode_st &inode, int blockNb, uint8_t *buffer) {
+		return false;
+	}
+
+	bool PoolManager::addEntry(inode_st &parentInode, std::string entry, inode_st &entryInode) {
+		return false;
+	}
+
+	bool PoolManager::delEntry(inode_st &parentInode, std::string entry) {
+		return false;
+	}
+
+	bool PoolManager::getEntry(inode_st &parentInode, std::string entry, inode_st &entryInode) {
+		return false;
+	}
+
+	bool PoolManager::setEntry(inode_st &parentInode, std::string entry, inode_st &entryInode) {
+		return false;
+	}
+
+	bool PoolManager::addLink(inode_st &parentInode, std::string link, ident_st linkId) {
+		return false;
+	}
+
+	bool PoolManager::delLink(inode_st &parentInode, std::string link) {
+		return false;
+	}
+
+	bool PoolManager::getRoot(inode_st &rootInode) {
+		return false;
+	}
+
+	bool PoolManager::addInode(inode_st &inode) {
+		return false;
+	}
+
+	bool PoolManager::delInode(ident_st inodeId) {
+		return false;
+	}
+
+	bool PoolManager::getInode(ident_st inodeId, inode_st &inode) {
+		return false;
+	}
+
+	bool PoolManager::setInode(ident_st inodeId, inode_st &inode) {
+		return false;
+	}
+}  // namespace mtfs

@@ -3,30 +3,31 @@
 
 #include <string>
 #include <vector>
-#include <list>
-#include <iostream>
-#include <assert.h>
-#include <FileStorage/structs.h>
-#include "FileStorage/Volume.h"
-#include "FileStorage/Rule.h"
-#include "PluginSystem/Plugin.h"
+#include <mtfs/structs.h>
+#include <mtfs/Volume.h>
+#include <mtfs/Rule.h>
+#include <PluginSystem/Plugin.h>
 
-namespace FileStorage {
+namespace mtfs {
 	class Pool {
-	private:
-		std::map<uint32_t, Volume> volumes;
+	public:
+		static const int VOLUME_ID_EXIST = -1;
 
-		std::map<uint32_t, Rule> rules;
+
+	private:
+		std::map<uint32_t, Volume *> volumes;
+
+		std::map<uint32_t, Rule *> rules;
 
 		int blockSize;
-
-		Rule *rule;
 
 
 	private:
 		bool chooseVolume(ruleInfo_t &info, PluginSystem::Plugin *volume);
 
 	public:
+		int addVolume(uint32_t volumeId, Volume *volume, Rule *rule);
+
 		bool addBlock(ruleInfo_t &info, uint16_t &volumeId, uint64_t &blockId);
 
 		bool delBlock(uint16_t volumeId, uint64_t blockId);
@@ -55,5 +56,5 @@ namespace FileStorage {
 
 	};
 
-}  // namespace FileStorage
+}  // namespace mtfs
 #endif

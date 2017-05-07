@@ -7,9 +7,9 @@
 #include <iostream>
 #include <assert.h>
 
-#include <FileStorage/structs.h>
+#include <mtfs/structs.h>
 
-namespace FileStorage {
+namespace mtfs {
 	class DirectoryEntryAccess {
 	public:
 		virtual bool addEntry(inode_st &parentInode, std::string entry, inode_st &entryInode)=0;
@@ -28,5 +28,5 @@ namespace FileStorage {
 
 	};
 
-}  // namespace FileStorage
+}  // namespace mtfs
 #endif

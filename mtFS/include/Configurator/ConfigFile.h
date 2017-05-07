@@ -9,7 +9,7 @@
 
 namespace Configurator {
 	class ConfigFile {
-	private:
+	public:
 		static constexpr const char *INODE_CACHE = "inodeCacheSize";
 		static constexpr const char *DIR_CACHE = "directoryCacheSize";
 		static constexpr const char *BLOCK_CACHE = "blockCacheSize";
@@ -26,6 +26,7 @@ namespace Configurator {
 		static constexpr const char *DENY_GROUP = "denyGroups";
 		static constexpr const char *TYPE = "type";
 
+	private:
 		const rapidjson::Document &d;
 
 		std::vector<PluginSystem::Plugin *> plugins;

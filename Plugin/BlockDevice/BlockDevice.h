@@ -8,7 +8,7 @@
 #include <assert.h>
 
 #include <PluginSystem/Plugin.h>
-#include <FileStorage/structs.h>
+#include <mtfs/structs.h>
 #include <map>
 #include <queue>
 
@@ -31,9 +31,9 @@ namespace PluginSystem {
 
 		bool delInode(std::uint64_t inodeId) override;
 
-		bool readInode(std::uint64_t inodeId, FileStorage::inode_st &inode) override;
+		bool readInode(std::uint64_t inodeId, mtfs::inode_st &inode) override;
 
-		bool writeInode(std::uint64_t inodeId, FileStorage::inode_st &inode) override;
+		bool writeInode(std::uint64_t inodeId, mtfs::inode_st &inode) override;
 
 		bool addBlock(std::uint64_t &blockId) override;
 
@@ -43,15 +43,14 @@ namespace PluginSystem {
 
 		bool writeBlock(std::uint64_t blockId, std::uint8_t *buffe) override;
 
-		bool readSuperblock(FileStorage::superblock_t &superblock) override;
+		bool readSuperblock(mtfs::superblock_t &superblock) override;
 
-		bool writeSuperblock(FileStorage::superblock_t superblock) override;
+		bool writeSuperblock(mtfs::superblock_t &superblock) override;
 
 	private:
 		std::string mountpoint;
 		std::string devicePath;
 		std::string fsType;
-		int blockSize;
 		std::vector<uint64_t> freeInodes;
 		uint64_t nextFreeInode;
 

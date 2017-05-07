@@ -4,9 +4,9 @@
 #include <iostream>
 #include <assert.h>
 
-#include "FileStorage/Cache.h"
+#include "mtfs/Cache.h"
 
-namespace FileStorage {
+namespace mtfs {
 
 
-}  // namespace FileStorage
+}  // namespace mtfs

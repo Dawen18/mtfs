@@ -17,7 +17,7 @@
 
 using namespace std;
 using namespace rapidjson;
-using namespace FileStorage;
+using namespace mtfs;
 
 namespace PluginSystem {
 	BlockDevice::BlockDevice() {
@@ -28,23 +28,30 @@ namespace PluginSystem {
 	vector<string> BlockDevice::getInfos() {
 		vector<string> infos;
 		infos.push_back("block");
+//		infos.push_back("home");
 		infos.push_back("devicePath");
+		infos.push_back("fsType");
 
 		return infos;
 	}
 
 	bool BlockDevice::attach(std::map<string, string> params) {
-		if (params.find("blocksize") == params.end() || params.find("devicePath") == params.end() ||
-			params.find("home") == params.end() || params.find("fsType") == params.end())
+		if (params.find("devicePath") == params.end() || params.find("home") == params.end() ||
+			params.find("fsType") == params.end())
 			return false;
 
-		this->blockSize = stoi(params.at("blocksize"));
 		string home;
 		home = params.at("home");
+		if (*home.end() != '/')
+			home += '/';
 		string parentDir = home + "BlockDevices/";
 		this->fsType = params.at("fsType");
 		this->devicePath = params.at("devicePath");
 		this->mountpoint = parentDir + this->devicePath.substr(this->devicePath.find('/', 1) + 1);
+
+#ifdef DEBUG
+		cout << "attach to " << this->mountpoint;
+#endif
 
 		if (!dirExists(parentDir)) {
 			if (mkdir(parentDir.c_str(), 0700) != 0) {
@@ -113,7 +120,7 @@ namespace PluginSystem {
 		return deleteFile(filename);
 	}
 
-	bool BlockDevice::readInode(std::uint64_t inodeId, FileStorage::inode_st &inode) {
+	bool BlockDevice::readInode(std::uint64_t inodeId, mtfs::inode_st &inode) {
 		string filename = this->mountpoint + "/" + INODES_DIR + "/" + to_string(inodeId);
 		ifstream file(filename);
 		if (!file.is_open())
@@ -160,11 +167,11 @@ namespace PluginSystem {
 		const Value &dataArray = d["dataBlocks"];
 		assert(dataArray.IsArray());
 		inode.dataBlocks.clear();
-		for (auto &a : dataArray.GetArray()){
+		for (auto &a : dataArray.GetArray()) {
 			vector<ident_t> redundancy;
 
 			assert(a.IsArray());
-			for (auto &v : a.GetArray()){
+			for (auto &v : a.GetArray()) {
 				ident_t ident;
 
 				assert(v.IsObject());
@@ -185,7 +192,7 @@ namespace PluginSystem {
 		return true;
 	}
 
-	bool BlockDevice::writeInode(std::uint64_t inodeId, FileStorage::inode_st &inode) {
+	bool BlockDevice::writeInode(std::uint64_t inodeId, mtfs::inode_st &inode) {
 		Document d;
 		d.SetObject();
 		Document::AllocatorType &alloc = d.GetAllocator();
@@ -212,7 +219,7 @@ namespace PluginSystem {
 		for (auto b = inode.referenceId.begin(); b != inode.referenceId.end(); b++) {
 			Value o(kObjectType);
 
-			FileStorage::ident_t ident = *b;
+			mtfs::ident_t ident = *b;
 			v.SetUint(ident.poolId);
 			o.AddMember(StringRef("poolId"), v, alloc);
 			v.SetUint(ident.volumeId);
@@ -278,11 +285,11 @@ namespace PluginSystem {
 		return false;
 	}
 
-	bool BlockDevice::readSuperblock(FileStorage::superblock_t &superblock) {
+	bool BlockDevice::readSuperblock(mtfs::superblock_t &superblock) {
 		return false;
 	}
 
-	bool BlockDevice::writeSuperblock(FileStorage::superblock_t superblock) {
+	bool BlockDevice::writeSuperblock(superblock_t &superblock) {
 		return false;
 	}
 

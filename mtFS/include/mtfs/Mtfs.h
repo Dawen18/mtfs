@@ -3,11 +3,13 @@
 
 #include <thread>
 
-#include "FileStorage/InodeAcces.h"
-#include "FileStorage/BlockAccess.h"
-#include "FileStorage/DirectoryEntryAccess.h"
+#include <mtfs/Rule.h>
+#include <mtfs/InodeAcces.h>
+#include <mtfs/BlockAccess.h>
+#include <mtfs/DirectoryEntryAccess.h>
+#include <rapidjson/document.h>
 
-namespace FileStorage {
+namespace mtfs {
 	class Mtfs {
 	public:
 		static const int TIME_MIGRATION = 0;
@@ -34,7 +36,10 @@ namespace FileStorage {
 		static void join();
 
 		static bool migrationIsValid(const int migration);
+
+		static Rule *buildRule(int migration, rapidjson::Value &value);
+
 	};
 
-}  // namespace FileStorage
+}  // namespace mtfs
 #endif

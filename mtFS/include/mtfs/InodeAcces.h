@@ -6,9 +6,9 @@
 #include <list>
 #include <iostream>
 #include <assert.h>
-#include <FileStorage/structs.h>
+#include <mtfs/structs.h>
 
-namespace FileStorage {
+namespace mtfs {
 	class InodeAcces {
 	public:
 		virtual bool addInode(inode_st &inode)=0;
@@ -21,5 +21,5 @@ namespace FileStorage {
 
 	};
 
-}  // namespace FileStorage
+}  // namespace mtfs
 #endif
