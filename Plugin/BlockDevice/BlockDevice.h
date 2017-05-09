@@ -7,7 +7,7 @@
 #include <iostream>
 #include <assert.h>
 
-#include <PluginSystem/Plugin.h>
+#include <pluginSystem/Plugin.h>
 #include <mtfs/structs.h>
 #include <map>
 #include <queue>

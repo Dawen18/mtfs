@@ -1,6 +1,3 @@
-#include <string>
-#include <vector>
-#include <list>
 #include <iostream>
 #include <sys/mount.h>
 #include <map>
@@ -28,7 +25,6 @@ namespace PluginSystem {
 	vector<string> BlockDevice::getInfos() {
 		vector<string> infos;
 		infos.push_back("block");
-//		infos.push_back("home");
 		infos.push_back("devicePath");
 		infos.push_back("fsType");
 

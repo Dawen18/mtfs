@@ -17,30 +17,24 @@
 
 namespace mtfs {
 	class PoolManager : public DirectoryEntryAccess, public BlockAccess, public InodeAcces {
+	public:
+		static const int SUCCESS = 0;
+		static const int POOL_ID_EXIST = -1;
+
 	private:
-		std::map<uint32_t, Pool> pools;
-
+		std::map<uint32_t, Pool *> pools;
+		std::map<uint32_t, Rule *> rules;
 		InodeCache *inodeCache;
-
 		BlockCache *blocksCache;
-
 		DirectoryEntryCache *dirEntryCache;
-
 		std::vector<ident_t> lockedBlocks;
-
 		std::vector<ident_t> lockedInodes;
-
 		std::map<ident_t, ident_t> translateMap;
 
 
-	private:
-		ident_t addBlockToEnd(inode_st inode);
-
-		bool freeLastBlock(inode_st inode);
-
-		bool choosePool(ruleInfo_st info, Pool *pool);
-
 	public:
+		int addPool(uint32_t poolId, Pool *pool, Rule *rule);
+
 		bool addBlock(inode_st &inode) override;
 
 		bool delBlock(inode_st &inode) override;
@@ -71,6 +65,12 @@ namespace mtfs {
 
 		bool setInode(ident_st inodeId, inode_st &inode) override;
 
+	private:
+		ident_t addBlockToEnd(inode_st inode);
+
+		bool freeLastBlock(inode_st inode);
+
+		bool choosePool(ruleInfo_st info, Pool *pool);
 	};
 
 }  // namespace mtfs

@@ -1,12 +1,10 @@
-#include <string>
-#include <vector>
-#include <list>
-#include <iostream>
-#include <assert.h>
-
 #include "mtfs/UserRightRule.h"
 
 namespace mtfs {
+	bool UserRightRule::rulesAreValid(const rapidjson::Value &value) {
+		return (value.HasMember(ALLOW_USER) || value.HasMember(ALLOW_GROUP) ||
+				value.HasMember(DENY_USER) || value.HasMember(DENY_GROUP));
+	}
 
 	void UserRightRule::addAllowUid(uid_t uid) {
 		uidAllowed.push_back(uid);

@@ -2,17 +2,15 @@
 
 namespace mtfs {
 
-	ident_t PoolManager::addBlockToEnd(inode_t inode) {
-		ident_t ident;
-		return ident;
-	}
 
-	bool PoolManager::freeLastBlock(inode_t inode) {
-		return false;
-	}
+	int PoolManager::addPool(uint32_t poolId, Pool *pool, Rule *rule) {
+		if (pools.find(poolId) != pools.end())
+			return POOL_ID_EXIST;
 
-	bool PoolManager::choosePool(ruleInfo_t info, Pool *pool) {
-		return false;
+		pools[poolId] = pool;
+		rules[poolId] = rule;
+
+		return SUCCESS;
 	}
 
 	bool PoolManager::addBlock(inode_st &inode) {
@@ -74,4 +72,19 @@ namespace mtfs {
 	bool PoolManager::setInode(ident_st inodeId, inode_st &inode) {
 		return false;
 	}
+
+
+	ident_t PoolManager::addBlockToEnd(inode_t inode) {
+		ident_t ident;
+		return ident;
+	}
+
+	bool PoolManager::freeLastBlock(inode_t inode) {
+		return false;
+	}
+
+	bool PoolManager::choosePool(ruleInfo_t info, Pool *pool) {
+		return false;
+	}
+
 }  // namespace mtfs

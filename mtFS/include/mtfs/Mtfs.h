@@ -12,8 +12,11 @@
 namespace mtfs {
 	class Mtfs {
 	public:
-		static const int TIME_MIGRATION = 0;
-		static const int RIGHT_MIGRATION = 1;
+		static constexpr const char *INODE_CACHE = "inodeCacheSize";
+		static constexpr const char *DIR_CACHE = "directoryCacheSize";
+		static constexpr const char *BLOCK_CACHE = "blockCacheSize";
+		static constexpr const char *BLOCK_SIZE = "blockSize";
+		static constexpr const char *REDUNDANCY = "redundancy";
 
 	private:
 		InodeAcces *inodes;
@@ -23,22 +26,22 @@ namespace mtfs {
 		static std::thread *thr;
 
 
-		Mtfs();
-
-		static void loop();
-
-
 	public:
 		static Mtfs *getInstance();
+
+		static bool validate(const rapidjson::Value &system);
 
 		static void start();
 
 		static void join();
 
-		static bool migrationIsValid(const int migration);
+		bool build(const rapidjson::Value &system, std::string homeDir);
 
-		static Rule *buildRule(int migration, rapidjson::Value &value);
 
+	private:
+		Mtfs();
+
+		static void loop();
 	};
 
 }  // namespace mtfs

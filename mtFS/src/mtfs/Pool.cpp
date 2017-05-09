@@ -4,8 +4,35 @@ using namespace std;
 
 namespace mtfs {
 
+	bool Pool::validate(const rapidjson::Value &pool) {
+		if (!pool.HasMember(mtfs::Volume::VOLUMES))
+			throw invalid_argument("Volumes missing!");
+		if (!pool[mtfs::Volume::VOLUMES].IsObject())
+			throw invalid_argument("Volumes is not a object");
+
+		int migration = -1;
+		if (pool[mtfs::Volume::VOLUMES].MemberCount() <= 0)
+			throw invalid_argument("Number of volumes invalid!");
+		else if (pool[mtfs::Volume::VOLUMES].MemberCount() != 1) {
+			if (!pool.HasMember(Rule::MIGRATION))
+				throw invalid_argument("Migration missing!");
+
+			migration = pool[Rule::MIGRATION].GetInt();
+		}
+
+		for (auto &m: pool[mtfs::Volume::VOLUMES].GetObject()) {
+			if (!Rule::rulesAreValid(migration, m.value))
+				throw invalid_argument(string("Rules invalid for volume '") + m.name.GetString() + "'!");
+
+			if (!Volume::validate(m.value))
+				throw invalid_argument(string("Volume '") + m.name.GetString() + "' invalid!");
+		}
+
+		return true;
+	}
+
 	int Pool::addVolume(uint32_t volumeId, Volume *volume, Rule *rule) {
-		if (this->volumes.find(volumeId) == this->volumes.end() && this->rules.find(volumeId) == this->rules.end())
+		if (this->volumes.find(volumeId) != this->volumes.end() && this->rules.find(volumeId) != this->rules.end())
 			return VOLUME_ID_EXIST;
 
 		this->volumes[volumeId] = volume;

@@ -3,8 +3,7 @@ include_directories(../../mtFS/include ../../Plugin/)
 
 set(SRCS
 		../../Plugin/BlockDevice/BlockDevice.cpp
-		../../mtFS/src/Configurator/ConfigFile.cpp
-		../../mtFS/src/FileStorage/Mtfs.cpp
+		../../mtFS/src/mtfs/Mtfs.cpp
 		)
 
 add_definitions(-DDEBUG)

@@ -1,8 +1,3 @@
-#include <string>
-#include <vector>
-#include <list>
-#include <iostream>
-#include <assert.h>
 
 #include "mtfs/TimeRule.h"
 
@@ -11,5 +6,9 @@ namespace mtfs {
 
 	bool TimeRule::satisfyRules(ruleInfo_st info) {
 		return false;
+	}
+
+	bool TimeRule::rulesAreValid(const rapidjson::Value &value) {
+		return (value.HasMember(TIME_LOW_LIMIT) || value.HasMember(TIME_HIGH_LIMIT));
 	}
 }  // namespace mtfs

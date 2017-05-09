@@ -11,6 +11,12 @@
 
 namespace mtfs {
 	class UserRightRule : public Rule {
+	public:
+		static constexpr const char *ALLOW_USER = "allowUsers";
+		static constexpr const char *DENY_USER = "denyUsers";
+		static constexpr const char *ALLOW_GROUP = "allowGroups";
+		static constexpr const char *DENY_GROUP = "denyGroups";
+
 	private:
 		std::vector<uid_t> uidAllowed;
 
@@ -21,6 +27,8 @@ namespace mtfs {
 		std::vector<gid_t> gidDenied;
 
 	public:
+		static bool rulesAreValid(const rapidjson::Value &value);
+
 		void addAllowUid(uid_t uid);
 
 		void addDenyUid(uid_t uid);

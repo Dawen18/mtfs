@@ -13,6 +13,9 @@
 namespace PluginSystem {
 	class Plugin {
 	public:
+		static constexpr const char *TYPE = "type";
+
+
 		virtual std::vector<std::string> getInfos()=0;
 
 		virtual bool attach(std::map<std::string, std::string> params)=0;

@@ -4,20 +4,24 @@
 #include <string>
 #include <vector>
 
-#include <PluginSystem/Plugin.h>
+#include <pluginSystem/Plugin.h>
 #include <mtfs/structs.h>
+#include <rapidjson/document.h>
 
 namespace mtfs {
 	class Volume : public PluginSystem::Plugin {
+	public:
+		static constexpr const char *VOLUMES = "volumes";
+
 	private:
 		PluginSystem::Plugin *plugin;
-
 		std::map<uint64_t, uint64_t> blocksAccess;
-
 		std::map<uint64_t, uint64_t> inodesAccess;
 
 
 	public:
+		static bool validate(const rapidjson::Value &volume);
+
 		Volume(PluginSystem::Plugin *plugin);
 
 		bool setTimeLimits(int low, int high);

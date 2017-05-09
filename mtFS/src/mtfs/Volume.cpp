@@ -1,8 +1,27 @@
+#include <pluginSystem/PluginManager.h>
 #include "mtfs/Volume.h"
 
 using namespace std;
 
 namespace mtfs {
+	bool Volume::validate(const rapidjson::Value &volume) {
+		if (!volume.HasMember(TYPE))
+			return false;
+
+		pluginSystem::PluginManager *manager = pluginSystem::PluginManager::getInstance();
+
+		PluginSystem::Plugin *plugin = manager->getPlugin(volume[TYPE].GetString());
+		if (plugin == NULL)
+			return false;
+
+		vector<string> infos = plugin->getInfos();
+		infos.erase(infos.begin());
+		for (auto i:infos)
+			if (!volume.HasMember(i.c_str()))
+				return false;
+
+		return true;
+	}
 
 	Volume::Volume(PluginSystem::Plugin *plugin) : plugin(plugin) {}
 

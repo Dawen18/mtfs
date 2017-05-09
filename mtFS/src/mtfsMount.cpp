@@ -10,8 +10,7 @@
 #include <rapidjson/document.h>
 #include <rapidjson/istreamwrapper.h>
 #include <fstream>
-#include <Configurator/ConfigFile.h>
-#include <Configurator/PluginManager.h>
+#include <pluginSystem/PluginManager.h>
 #include <mtfs/PoolManager.h>
 #include <mtfs/Mtfs.h>
 
@@ -20,8 +19,6 @@
 
 using namespace std;
 using namespace rapidjson;
-using namespace Configurator;
-//using namespace mtfs;
 
 bool dirExists(string path);
 
@@ -55,65 +52,14 @@ int main(int argc, char **argv) {
 	Document d;
 	d.ParseStream(wrapper);
 
-	ConfigFile configFile(d);
 
-	if (!configFile.validateFile()) {
+	if (!mtfs::Mtfs::validate(d)) {
 		cerr << "Invalid or corrupted JSON!" << endl;
 		return -1;
 	}
 
-	PluginManager *pluginManager = PluginManager::getInstance();
-
-//	Instatiate classes
-
-
-//	iter pools
-	for (auto &p: d[ConfigFile::POOLS].GetObject()) {
-		int poolId = stoi(p.name.GetString());
-		cout << "poolId: " << poolId << endl;
-
-		mtfs::Pool *pool = new mtfs::Pool();
-
-		int migration = p.value[ConfigFile::MIGRATION].GetInt();
-
-//		iter volumes
-		for (auto &v: p.value.GetObject()[ConfigFile::VOLUMES].GetObject()) {
-			Value vol(kObjectType);
-			vol = v.value;
-
-			int volumeId = stoi(v.name.GetString());
-#ifdef DEBUG
-			cout << "\tvolumeId: " << volumeId << " type: " << vol[ConfigFile::TYPE].GetString() << endl;
-#endif
-
-			PluginSystem::Plugin *plugin = pluginManager->getPlugin(vol[ConfigFile::TYPE].GetString());
-			map<string, string> params;
-			params["home"] = HOME_DIR + string("/Plugins");
-
-//			Construct params
-			for (auto &param: vol.GetObject()) {
-				if (param.name.GetString() == "type")
-					continue;
-
-#ifdef DEBUG
-				cout << "\t\t" << param.name.GetString() << endl;
-#endif
-
-				params[param.name.GetString()] = param.value.GetString();
-			}
-
-			if (!plugin->attach(params)) {
-				cerr << "Failed to attach plugin " << plugin->getInfos()[0] << endl;
-				delete (plugin);
-
-				return -1;
-			}
-
-			mtfs::Volume *volume = new mtfs::Volume(plugin);
-
-			pool->addVolume((uint32_t) stoi(v.name.GetString()), volume, mtfs::Mtfs::buildRule(migration, vol));
-		}
-	}
+	mtfs::Mtfs *mtfs = mtfs::Mtfs::getInstance();
+	mtfs->build(d, HOME_DIR);
 
 	return 0;
 }

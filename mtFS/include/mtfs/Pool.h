@@ -6,11 +6,12 @@
 #include <mtfs/structs.h>
 #include <mtfs/Volume.h>
 #include <mtfs/Rule.h>
-#include <PluginSystem/Plugin.h>
+#include <pluginSystem/Plugin.h>
 
 namespace mtfs {
 	class Pool {
 	public:
+		static constexpr const char *POOLS = "pools";
 		static const int VOLUME_ID_EXIST = -1;
 
 
@@ -22,10 +23,9 @@ namespace mtfs {
 		int blockSize;
 
 
-	private:
-		bool chooseVolume(ruleInfo_t &info, PluginSystem::Plugin *volume);
-
 	public:
+		static bool validate(const rapidjson::Value &pool);
+
 		int addVolume(uint32_t volumeId, Volume *volume, Rule *rule);
 
 		bool addBlock(ruleInfo_t &info, uint16_t &volumeId, uint64_t &blockId);
@@ -54,6 +54,9 @@ namespace mtfs {
 
 		void moveBlocks(std::vector<move_t> &asMoved, std::vector<ident_t> &needOtherPool);
 
+
+	private:
+		bool chooseVolume(ruleInfo_t &info, PluginSystem::Plugin *volume);
 	};
 
 }  // namespace mtfs

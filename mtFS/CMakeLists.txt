@@ -18,13 +18,14 @@ set(FS_HEAD
 		)
 
 set(FS_SRC
-		src/FileStorage/Cache.cpp
-		src/FileStorage/Mtfs.cpp
-		src/FileStorage/Pool.cpp
-		src/FileStorage/PoolManager.cpp
-		src/FileStorage/TimeRule.cpp
-		src/FileStorage/UserRightRule.cpp
-		src/FileStorage/Volume.cpp)
+		src/mtfs/Cache.cpp
+		src/mtfs/Mtfs.cpp
+		src/mtfs/Pool.cpp
+		src/mtfs/PoolManager.cpp
+		src/mtfs/Rule.cpp
+		src/mtfs/TimeRule.cpp
+		src/mtfs/UserRightRule.cpp
+		src/mtfs/Volume.cpp)
 
 set(MTFUSE_HEAD
 		include/MtfsFuse/FuseBase.h
@@ -39,13 +40,11 @@ set(MTFUSE_SRC
 		)
 
 set(CONF_HEAD
-		include/Configurator/ConfigFile.h
-		include/Configurator/PluginManager.h
+		include/pluginSystem/PluginManager.h
 		)
 
 set(CONF_SRC
-		src/Configurator/ConfigFile.cpp
-		src/Configurator/PluginManager.cpp
+		src/pluginSystem/PluginManager.cpp
 		)
 
 add_executable(mtfsCreate ${MTFUSE_SRC} ${MTFUSE_HEAD} ${FS_HEAD} ${FS_SRC} src/main.cpp)
