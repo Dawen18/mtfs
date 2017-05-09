@@ -18,14 +18,14 @@ namespace pluginSystem {
 		return instance;
 	}
 
-	PluginSystem::Plugin *PluginManager::getPlugin(string pluginName) {
-		map<string, PluginSystem::Plugin *>::iterator it;
+	pluginSystem::Plugin *PluginManager::getPlugin(string pluginName) {
+		map<string, pluginSystem::Plugin *>::iterator it;
 
 		it = pluginMap.find(pluginName);
 		if (it == pluginMap.end())
 			return nullptr;
 
-		return new PluginSystem::BlockDevice;
+		return new pluginSystem::BlockDevice;
 	}
 
 	PluginManager::PluginManager() {
@@ -33,7 +33,7 @@ namespace pluginSystem {
 	}
 
 	void PluginManager::loadPlugins() {
-		PluginSystem::BlockDevice *blockDevice = new PluginSystem::BlockDevice();
+		pluginSystem::BlockDevice *blockDevice = new pluginSystem::BlockDevice();
 		string name = blockDevice->getInfos()[0];
 
 		pluginMap[name] = blockDevice;

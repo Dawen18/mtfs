@@ -5,7 +5,7 @@
 
 #include <thread>
 #include <iostream>
-#include <FileStorage/Mtfs.h>
+#include <mtfs/Mtfs.h>
 
 #define _GNU_SOURCE
 #define FUSE_USE_VERSION 30
@@ -25,7 +25,7 @@ void th1(int i) {
 
 int main(int argc, char **argv) {
 
-	Mtfs *mtfs = mtfs::getInstance();
+	Mtfs *mtfs = Mtfs::getInstance();
 
 	mtfs->start();
 	mtfs->join();

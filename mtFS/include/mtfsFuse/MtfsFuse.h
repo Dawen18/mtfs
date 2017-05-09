@@ -7,9 +7,9 @@
 #include <iostream>
 #include <assert.h>
 
-#include "MtfsFuse/FuseBase.h"
+#include "mtfsFuse/FuseBase.h"
 
-namespace MtfsFuse
+namespace mtfsFuse
 {
 class MtfsFuse : public FuseBase
 {
@@ -18,5 +18,5 @@ protected:
 
 };
 
-}  // namespace MtfsFuse
+}  // namespace mtfsFuse
 #endif

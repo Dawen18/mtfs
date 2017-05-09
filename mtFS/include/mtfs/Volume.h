@@ -9,12 +9,12 @@
 #include <rapidjson/document.h>
 
 namespace mtfs {
-	class Volume : public PluginSystem::Plugin {
+	class Volume : public pluginSystem::Plugin {
 	public:
 		static constexpr const char *VOLUMES = "volumes";
 
 	private:
-		PluginSystem::Plugin *plugin;
+		pluginSystem::Plugin *plugin;
 		std::map<uint64_t, uint64_t> blocksAccess;
 		std::map<uint64_t, uint64_t> inodesAccess;
 
@@ -22,7 +22,7 @@ namespace mtfs {
 	public:
 		static bool validate(const rapidjson::Value &volume);
 
-		Volume(PluginSystem::Plugin *plugin);
+		Volume(pluginSystem::Plugin *plugin);
 
 		bool setTimeLimits(int low, int high);
 

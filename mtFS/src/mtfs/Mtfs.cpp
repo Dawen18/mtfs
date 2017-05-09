@@ -85,10 +85,10 @@ namespace mtfs {
 
 		pluginSystem::PluginManager *pluginManager = pluginSystem::PluginManager::getInstance();
 
-//	Instatiate classes
+		//	Instatiate classes
 		mtfs::PoolManager *poolManager = new mtfs::PoolManager();
 
-//	iter pools
+		//	iter pools
 		for (auto &p: system[mtfs::Pool::POOLS].GetObject()) {
 			int poolId = stoi(p.name.GetString());
 			cout << "poolId: " << poolId << endl;
@@ -99,25 +99,25 @@ namespace mtfs {
 			if (p.value[mtfs::Volume::VOLUMES].MemberCount() != 1)
 				volMigration = p.value[mtfs::Rule::MIGRATION].GetInt();
 
-//		iter volumes
+			//		iter volumes
 			for (auto &v: p.value.GetObject()[mtfs::Volume::VOLUMES].GetObject()) {
 
 				int volumeId = stoi(v.name.GetString());
 #ifdef DEBUG
-				cout << "\tvolumeId: " << volumeId << " type: " << v.value[PluginSystem::Plugin::TYPE].GetString()
+				cout << "\tvolumeId: " << volumeId << " type: " << v.value[pluginSystem::Plugin::TYPE].GetString()
 					 << endl;
 #endif
 
-				PluginSystem::Plugin *plugin = pluginManager->getPlugin(
-						v.value[PluginSystem::Plugin::TYPE].GetString());
+				pluginSystem::Plugin *plugin = pluginManager->getPlugin(
+						v.value[pluginSystem::Plugin::TYPE].GetString());
 				map<string, string> params;
 				params["home"] = homeDir + "/Plugins";
 
-//			Construct params
+				//			Construct params
 				vector<string> neededParams = plugin->getInfos();
 				neededParams.erase(neededParams.begin());
 				for (auto &param: neededParams) {
-//				cout << param << endl;
+					//				cout << param << endl;
 					params[param] = v.value[param.c_str()].GetString();
 				}
 
@@ -136,6 +136,10 @@ namespace mtfs {
 			poolManager->addPool((uint32_t) stoul(p.name.GetString()), pool,
 								 mtfs::Rule::buildRule(mainMigration, p.value));
 		}
+
+		this->inodes = poolManager;
+		this->dirEntries = poolManager;
+		this->blocks = poolManager;
 
 		return true;
 	}

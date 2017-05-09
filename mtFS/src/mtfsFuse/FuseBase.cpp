@@ -1,12 +1,7 @@
-#include <string>
-#include <vector>
-#include <list>
-#include <iostream>
-#include <assert.h>
 
-#include "MtfsFuse/FuseBase.h"
+#include "mtfsFuse/FuseBase.h"
 
-namespace MtfsFuse {
+namespace mtfsFuse {
 
 	FuseBase::FuseBase() {
 		callbacks = FuseCallback::getInstance();
@@ -21,4 +16,4 @@ namespace MtfsFuse {
 	}
 
 
-}  // namespace MtfsFuse
+}  // namespace mtfsFuse

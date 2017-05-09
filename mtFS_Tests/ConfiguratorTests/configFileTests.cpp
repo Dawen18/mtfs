@@ -4,84 +4,86 @@
 **/
 
 #include <gtest/gtest.h>
-#include <Configurator/ConfigFile.h>
 #include <rapidjson/document.h>
+#include <mtfs/Mtfs.h>
+#include <mtfs/TimeRule.h>
+#include <mtfs/UserRightRule.h>
 
-class ConfigFileFixture : public ::testing::Test {
+class ConfigFixture : public ::testing::Test {
 public:
-	ConfigFileFixture() {
+	ConfigFixture() {
 
 	}
 
 	virtual void SetUp() {
 		d.SetObject();
-		configFile = new Configurator::ConfigFile(d);
+		fs = mtfs::Mtfs::getInstance();
 	}
 
 	virtual void TearDown() {
 		d.RemoveAllMembers();
 	}
 
-	~ConfigFileFixture() {
+	~ConfigFixture() {
 
 	}
 
 	rapidjson::Document d;
 	rapidjson::Value v;
-	Configurator::ConfigFile *configFile;
+	mtfs::Mtfs *fs;
 };
 
-TEST_F(ConfigFileFixture, validateTime) {
+TEST_F(ConfigFixture, validateTime) {
 
 	v.SetInt(2);
 	rapidjson::Document::AllocatorType &allocator = d.GetAllocator();
 
-	ASSERT_FALSE(configFile->validateTime(d));
+	ASSERT_FALSE(mtfs::TimeRule::rulesAreValid(d));
 
 	d.AddMember(rapidjson::StringRef("lowLimit"), v, allocator);
-	ASSERT_TRUE(configFile->validateTime(d));
+	ASSERT_TRUE(mtfs::TimeRule::rulesAreValid(d));
 
 	d.AddMember(rapidjson::StringRef("highLimit"), v, allocator);
-	ASSERT_TRUE(configFile->validateTime(d));
+	ASSERT_TRUE(mtfs::TimeRule::rulesAreValid(d));
 
 	d.RemoveMember("lowLimit");
-	ASSERT_TRUE(configFile->validateTime(d));
+	ASSERT_TRUE(mtfs::TimeRule::rulesAreValid(d));
 
 	d.RemoveMember("highLimit");
-	ASSERT_FALSE(configFile->validateTime(d));
+	ASSERT_FALSE(mtfs::TimeRule::rulesAreValid(d));
 }
 
-TEST_F(ConfigFileFixture, validateRight) {
-	ASSERT_FALSE(configFile->validateRight(d));
+TEST_F(ConfigFixture, validateRight) {
+	ASSERT_FALSE(mtfs::UserRightRule::rulesAreValid(d));
 
 	rapidjson::Document::AllocatorType &allocator = d.GetAllocator();
 	v.SetInt(1);
 
 	d.AddMember(rapidjson::StringRef("allowUsers"), v, allocator);
-	ASSERT_TRUE(configFile->validateRight(d));
+	ASSERT_TRUE(mtfs::UserRightRule::rulesAreValid(d));
 
 	d.AddMember(rapidjson::StringRef("allowGroups"), v, allocator);
-	ASSERT_TRUE(configFile->validateRight(d));
+	ASSERT_TRUE(mtfs::UserRightRule::rulesAreValid(d));
 
 	d.RemoveMember("allowUsers");
-	ASSERT_TRUE(configFile->validateRight(d));
+	ASSERT_TRUE(mtfs::UserRightRule::rulesAreValid(d));
 
 	d.AddMember(rapidjson::StringRef("denyUsers"), v, allocator);
-	ASSERT_TRUE(configFile->validateRight(d));
+	ASSERT_TRUE(mtfs::UserRightRule::rulesAreValid(d));
 
 	d.RemoveMember("allowGroups");
-	ASSERT_TRUE(configFile->validateRight(d));
+	ASSERT_TRUE(mtfs::UserRightRule::rulesAreValid(d));
 
 	d.AddMember(rapidjson::StringRef("denyGroups"), v, allocator);
-	ASSERT_TRUE(configFile->validateRight(d));
+	ASSERT_TRUE(mtfs::UserRightRule::rulesAreValid(d));
 
 	d.RemoveMember("denyUsers");
-	ASSERT_TRUE(configFile->validateRight(d));
+	ASSERT_TRUE(mtfs::UserRightRule::rulesAreValid(d));
 
 	d.AddMember(rapidjson::StringRef("allowUsers"), v, allocator);
 	d.AddMember(rapidjson::StringRef("allowGroups"), v, allocator);
 	d.AddMember(rapidjson::StringRef("denyUsers"), v, allocator);
-	ASSERT_TRUE(configFile->validateRight(d));
+	ASSERT_TRUE(mtfs::UserRightRule::rulesAreValid(d));
 }
 
 

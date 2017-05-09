@@ -7,10 +7,10 @@
 #include <list>
 #include <iostream>
 
-#include "MtfsFuse/FuseBase.h"
+#include "mtfsFuse/FuseBase.h"
 
 
-namespace MtfsFuse {
+namespace mtfsFuse {
 	class FuseBase;
 
 	class FuseCallback {
@@ -124,5 +124,5 @@ namespace MtfsFuse {
 
 	};
 
-}  // namespace MtfsFuse
+}  // namespace mtfsFuse
 #endif

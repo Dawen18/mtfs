@@ -12,7 +12,7 @@
 #include <map>
 #include <queue>
 
-namespace PluginSystem {
+namespace pluginSystem {
 	class BlockDevice : public Plugin {
 		static constexpr const char *INODES_DIR = "inodes";
 		static constexpr const char *BLOCKS_DIR = "blocks";
@@ -51,8 +51,13 @@ namespace PluginSystem {
 		std::string mountpoint;
 		std::string devicePath;
 		std::string fsType;
+		
 		std::vector<uint64_t> freeInodes;
 		uint64_t nextFreeInode;
+		
+		std::vector<uint64_t > freeBlocks;
+		uint64_t nextFreeBlock;
+		
 
 		void initDirHierarchie();
 

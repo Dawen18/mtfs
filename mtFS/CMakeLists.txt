@@ -28,15 +28,15 @@ set(FS_SRC
 		src/mtfs/Volume.cpp)
 
 set(MTFUSE_HEAD
-		include/MtfsFuse/FuseBase.h
-		include/MtfsFuse/FuseCallback.h
-		include/MtfsFuse/MtfsFuse.h
+		include/mtfsFuse/FuseBase.h
+		include/mtfsFuse/FuseCallback.h
+		include/mtfsFuse/MtfsFuse.h
 		)
 
 set(MTFUSE_SRC
-		src/MtfsFuse/FuseBase.cpp
-		src/MtfsFuse/FuseCallback.cpp
-		src/MtfsFuse/MtfsFuse.cpp
+		src/mtfsFuse/FuseBase.cpp
+		src/mtfsFuse/FuseCallback.cpp
+		src/mtfsFuse/MtfsFuse.cpp
 		)
 
 set(CONF_HEAD

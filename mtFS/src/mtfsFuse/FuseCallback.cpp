@@ -4,9 +4,9 @@
 #include <iostream>
 #include <assert.h>
 
-#include <MtfsFuse/FuseCallback.h>
+#include <mtfsFuse/FuseCallback.h>
 
-namespace MtfsFuse {
+namespace mtfsFuse {
 	FuseCallback *FuseCallback::self = 0;
 	FuseBase *FuseCallback::base = 0;
 
@@ -375,4 +375,4 @@ namespace MtfsFuse {
 	}
 
 
-}  // namespace MtfsFuse
+}  // namespace mtfsFuse

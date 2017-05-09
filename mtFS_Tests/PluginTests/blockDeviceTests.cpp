@@ -8,7 +8,7 @@
 //#include <mtfs/structs.h>
 
 using namespace std;
-using namespace PluginSystem;
+using namespace pluginSystem;
 
 const string HOME = "/home/david/Cours/4eme/Travail_bachelor/Home/Plugins/";
 
@@ -62,6 +62,7 @@ TEST_F(BlockDeviceFixture, getInfosTest) {
 	vector<string> winfo;
 	winfo.push_back("block");
 	winfo.push_back("devicePath");
+	winfo.push_back("fsType");
 
 	ASSERT_EQ(infos.size(), winfo.size());
 

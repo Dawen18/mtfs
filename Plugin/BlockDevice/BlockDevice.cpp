@@ -16,7 +16,7 @@ using namespace std;
 using namespace rapidjson;
 using namespace mtfs;
 
-namespace PluginSystem {
+namespace pluginSystem {
 	BlockDevice::BlockDevice() {
 		srand((unsigned int) time(NULL));
 		this->nextFreeInode = 1;

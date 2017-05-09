@@ -4,11 +4,11 @@
 #include <iostream>
 #include <assert.h>
 
-#include "MtfsFuse/MtfsFuse.h"
+#include "mtfsFuse/MtfsFuse.h"
 
-namespace MtfsFuse {
+namespace mtfsFuse {
 
 	bool MtfsFuse::runPrepare(int argc, char **argv) {
 		return false;
 	}
-}  // namespace MtfsFuse
+}  // namespace mtfsFuse

@@ -8,10 +8,10 @@
 #include <iostream>
 #include <assert.h>
 
-#include "MtfsFuse/FuseCallback.h"
+#include "mtfsFuse/FuseCallback.h"
 
 
-namespace MtfsFuse {
+namespace mtfsFuse {
 	class FuseCallback;
 
 	class FuseBase {
@@ -124,5 +124,5 @@ namespace MtfsFuse {
 
 	};
 
-}  // namespace MtfsFuse
+}  // namespace mtfsFuse
 #endif

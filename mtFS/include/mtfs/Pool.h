@@ -56,7 +56,7 @@ namespace mtfs {
 
 
 	private:
-		bool chooseVolume(ruleInfo_t &info, PluginSystem::Plugin *volume);
+		bool chooseVolume(ruleInfo_t &info, pluginSystem::Plugin *volume);
 	};
 
 }  // namespace mtfs

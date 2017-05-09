@@ -10,7 +10,7 @@
 #include <mtfs/structs.h>
 #include <map>
 
-namespace PluginSystem {
+namespace pluginSystem {
 	class Plugin {
 	public:
 		static constexpr const char *TYPE = "type";

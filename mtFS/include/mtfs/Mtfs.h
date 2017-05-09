@@ -20,8 +20,8 @@ namespace mtfs {
 
 	private:
 		InodeAcces *inodes;
-		BlockAccess *blocs;
-		DirectoryEntryAccess *dirEntry;
+		BlockAccess *blocks;
+		DirectoryEntryAccess *dirEntries;
 		static Mtfs *instance;
 		static std::thread *thr;
 

@@ -15,7 +15,7 @@ namespace pluginSystem {
 	public:
 		static PluginManager *getInstance();
 
-		PluginSystem::Plugin *getPlugin(std::string pluginName);
+		pluginSystem::Plugin *getPlugin(std::string pluginName);
 
 	private:
 		PluginManager();
@@ -23,7 +23,7 @@ namespace pluginSystem {
 		void loadPlugins();
 
 
-		std::map<std::string, PluginSystem::Plugin *> pluginMap;
+		std::map<std::string, pluginSystem::Plugin *> pluginMap;
 		static PluginManager *instance;
 
 	};

@@ -10,7 +10,7 @@ namespace mtfs {
 
 		pluginSystem::PluginManager *manager = pluginSystem::PluginManager::getInstance();
 
-		PluginSystem::Plugin *plugin = manager->getPlugin(volume[TYPE].GetString());
+		pluginSystem::Plugin *plugin = manager->getPlugin(volume[TYPE].GetString());
 		if (plugin == NULL)
 			return false;
 
@@ -23,7 +23,7 @@ namespace mtfs {
 		return true;
 	}
 
-	Volume::Volume(PluginSystem::Plugin *plugin) : plugin(plugin) {}
+	Volume::Volume(pluginSystem::Plugin *plugin) : plugin(plugin) {}
 
 	bool Volume::setTimeLimits(int low, int high) {
 		return false;

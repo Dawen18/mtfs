@@ -92,7 +92,7 @@ namespace mtfs {
 	void Pool::moveBlocks(vector<move_t> &asMoved, vector<ident_t> &needOtherPool) {
 	}
 
-	bool Pool::chooseVolume(ruleInfo_t &info, PluginSystem::Plugin *volume) {
+	bool Pool::chooseVolume(ruleInfo_t &info, pluginSystem::Plugin *volume) {
 		return false;
 	}
 }  // namespace mtfs
