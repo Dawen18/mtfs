@@ -46,7 +46,7 @@ namespace pluginSystem {
 		this->mountpoint = parentDir + this->devicePath.substr(this->devicePath.find('/', 1) + 1);
 
 #ifdef DEBUG
-		cout << "attach to " << this->mountpoint;
+//		cout << "attach to " << this->mountpoint;
 #endif
 
 		if (!dirExists(parentDir)) {

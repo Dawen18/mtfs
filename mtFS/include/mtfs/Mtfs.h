@@ -8,6 +8,8 @@
 #include <mtfs/BlockAccess.h>
 #include <mtfs/DirectoryEntryAccess.h>
 #include <rapidjson/document.h>
+#include <mutex>
+#include <utils/ThreadQueue.h>
 
 namespace mtfs {
 	class Mtfs {
@@ -19,11 +21,15 @@ namespace mtfs {
 		static constexpr const char *REDUNDANCY = "redundancy";
 
 	private:
+		static Mtfs *instance;
+		static std::thread *thr;
+		static std::mutex mutex;
+		static bool keepRunning;
+
 		InodeAcces *inodes;
 		BlockAccess *blocks;
 		DirectoryEntryAccess *dirEntries;
-		static Mtfs *instance;
-		static std::thread *thr;
+		ThreadQueue<std::string> *synchronousQueue;
 
 
 	public:
@@ -31,11 +37,15 @@ namespace mtfs {
 
 		static bool validate(const rapidjson::Value &system);
 
-		static void start();
+		void setSynchronousQueue(ThreadQueue<std::string> *synchronousQueue);
 
-		static void join();
+		void start();
+
+		void join();
 
 		bool build(const rapidjson::Value &system, std::string homeDir);
+
+		void processSynchronous();
 
 
 	private:

@@ -13,6 +13,7 @@
 #include <pluginSystem/PluginManager.h>
 #include <mtfs/PoolManager.h>
 #include <mtfs/Mtfs.h>
+#include <mtfsFuse/MtfsFuse.h>
 
 #define HOME_DIR "/home/david/Cours/4eme/Travail_bachelor/Home"
 #define STORAGE_DIR "StorageSystem"
@@ -28,13 +29,14 @@ int main(int argc, char **argv) {
 	if (!dirExists(HOME_DIR)) {
 		cerr << "Sorry no configured system found." << endl;
 		cerr
-				<< "Please configure one or recover with -o device_in_system "
+				<< "Please configure one or recover with -r device_in_system "
 						"where device_in_system is a device wich was in the configuration."
 				<< endl;
 		return -1;
 	}
 
-	string filename = string(argv[1]) + ".json";
+//	string filename = string(argv[2]) + ".json";
+	string filename = "home.json";
 
 	if (!fileExists(string(HOME_DIR) + "/" + STORAGE_DIR, filename)) {
 		cerr << "File not found" << endl;
@@ -52,16 +54,27 @@ int main(int argc, char **argv) {
 	Document d;
 	d.ParseStream(wrapper);
 
-
+//	validate config file.
 	if (!mtfs::Mtfs::validate(d)) {
 		cerr << "Invalid or corrupted JSON!" << endl;
 		return -1;
 	}
 
+	ThreadQueue<string> *queue = new ThreadQueue<string>();
+
+//	build mtfs
 	mtfs::Mtfs *mtfs = mtfs::Mtfs::getInstance();
 	mtfs->build(d, HOME_DIR);
+	mtfs->setSynchronousQueue(queue);
+	mtfs->start();
 
-	return 0;
+//	build mtsfFuse.
+	mtfsFuse::MtfsFuse *mtfsFuse = new mtfsFuse::MtfsFuse();
+	mtfsFuse->setThreadQueue(queue);
+
+	return mtfsFuse->run(argc, argv);
+
+//	return 0;
 }
 
 

@@ -6,6 +6,8 @@ namespace mtfs {
 	using namespace std;
 	Mtfs *Mtfs::instance = 0;
 	thread *Mtfs::thr = 0;
+	std::mutex Mtfs::mutex;
+	bool Mtfs::keepRunning;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////											STATICS															////
@@ -64,10 +66,19 @@ namespace mtfs {
 	}
 
 	void Mtfs::start() {
+		std::unique_lock<std::mutex> lock(mutex);
+		if (keepRunning)
+			return;
+
+		keepRunning = true;
 		thr = new std::thread(&loop);
 	}
 
 	void Mtfs::join() {
+		std::unique_lock<std::mutex> lock(mutex);
+		keepRunning = false;
+		lock.unlock();
+
 		thr->join();
 	}
 
@@ -91,7 +102,7 @@ namespace mtfs {
 		//	iter pools
 		for (auto &p: system[mtfs::Pool::POOLS].GetObject()) {
 			int poolId = stoi(p.name.GetString());
-			cout << "poolId: " << poolId << endl;
+//			cout << "poolId: " << poolId << endl;
 
 			mtfs::Pool *pool = new mtfs::Pool();
 
@@ -104,8 +115,8 @@ namespace mtfs {
 
 				int volumeId = stoi(v.name.GetString());
 #ifdef DEBUG
-				cout << "\tvolumeId: " << volumeId << " type: " << v.value[pluginSystem::Plugin::TYPE].GetString()
-					 << endl;
+//				cout << "\tvolumeId: " << volumeId << " type: " << v.value[pluginSystem::Plugin::TYPE].GetString()
+//					 << endl;
 #endif
 
 				pluginSystem::Plugin *plugin = pluginManager->getPlugin(
@@ -144,27 +155,36 @@ namespace mtfs {
 		return true;
 	}
 
+	void Mtfs::processSynchronous() {
+		string message = synchronousQueue->front();
+		synchronousQueue->pop();
+
+		cout << "mtfs receive <" << message << ">" << endl;
+	}
+
+	void Mtfs::setSynchronousQueue(ThreadQueue<string> *synchronousQueue) {
+		Mtfs::synchronousQueue = synchronousQueue;
+	}
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////											PRIVATE															////
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	Mtfs::Mtfs() {
-//		PoolManager *poolManager = new PoolManager();
-//		inodes = poolManager;
-//		dirEntry = poolManager;
-//		blocs = poolManager;
+		keepRunning = false;
 	}
 
 	void Mtfs::loop() {
 
 		Mtfs *mtfs = getInstance();
-		int loc = 0;
-		std::cout << "thread\n";
-		for (int i = 0; i < 10; ++i) {
-			std::this_thread::sleep_for(std::chrono::milliseconds(i));
-			loc++;
-			std::cout << loc << "\n";
-		}
 
+		std::unique_lock<std::mutex> lock(mutex);
+		while (keepRunning) {
+			mutex.unlock();
+			mtfs->processSynchronous();
+			mutex.lock();
+		}
 	}
+
+
 }  // namespace mtfs
