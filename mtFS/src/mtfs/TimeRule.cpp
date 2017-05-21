@@ -8,7 +8,23 @@ namespace mtfs {
 		return false;
 	}
 
-	bool TimeRule::rulesAreValid(const rapidjson::Value &value) {
-		return (value.HasMember(TIME_LOW_LIMIT) || value.HasMember(TIME_HIGH_LIMIT));
+	int TimeRule::copyConfig(rapidjson::Document &source, rapidjson::Value &destination,
+							 rapidjson::Document::AllocatorType &allocator) {
+
+		if (source.HasMember(TIME_LOW_LIMIT))
+			destination.AddMember(rapidjson::StringRef(TIME_LOW_LIMIT), source[TIME_LOW_LIMIT], allocator);
+
+		if (source.HasMember(TIME_HIGH_LIMIT))
+			destination.AddMember(rapidjson::StringRef(TIME_HIGH_LIMIT), source[TIME_HIGH_LIMIT], allocator);
+
+		return SUCCESS;
+	}
+
+	int TimeRule::rulesAreValid(const rapidjson::Value &value) {
+		if (value.HasMember(TIME_LOW_LIMIT) || value.HasMember(TIME_HIGH_LIMIT)) {
+			return VALID_RULES;
+		} else {
+			return INVALID_RULES;
+		}
 	}
 }  // namespace mtfs

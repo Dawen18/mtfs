@@ -1,9 +1,19 @@
 #include "mtfs/UserRightRule.h"
 
 namespace mtfs {
-	bool UserRightRule::rulesAreValid(const rapidjson::Value &value) {
-		return (value.HasMember(ALLOW_USER) || value.HasMember(ALLOW_GROUP) ||
-				value.HasMember(DENY_USER) || value.HasMember(DENY_GROUP));
+	int UserRightRule::copyConfig(rapidjson::Document &source, rapidjson::Value &destination,
+								  rapidjson::Document::AllocatorType &allocator) {
+//		TODO copy config
+		return SUCCESS;
+	}
+
+	int UserRightRule::rulesAreValid(const rapidjson::Value &value) {
+		if (value.HasMember(ALLOW_USER) || value.HasMember(ALLOW_GROUP) ||
+			value.HasMember(DENY_USER) || value.HasMember(DENY_GROUP)) {
+			return VALID_RULES;
+		} else {
+			return INVALID_RULES;
+		}
 	}
 
 	void UserRightRule::addAllowUid(uid_t uid) {

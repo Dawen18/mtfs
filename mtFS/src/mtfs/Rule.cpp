@@ -1,7 +1,8 @@
-/**
- * @author David Wittwer
- * @date 09.05.17.
-**/
+/// \file Rule.cpp
+/// \brief Interface for Rule objects
+/// \author David Wittwer
+/// \version 0.0.1
+/// \date 01.05.17
 
 #include <mtfs/TimeRule.h>
 #include <mtfs/UserRightRule.h>
@@ -9,16 +10,28 @@
 
 namespace mtfs {
 
-	bool Rule::rulesAreValid(int migration, const rapidjson::Value &value) {
+	int Rule::copyConfig(int migration, rapidjson::Document &source, rapidjson::Value &destination,
+						 rapidjson::Document::AllocatorType &allocator) {
+		switch (migration) {
+			case TIME_MIGRATION:
+				return TimeRule::copyConfig(source, destination, allocator);
+			case RIGHT_MIGRATION:
+				return UserRightRule::copyConfig(source, destination, allocator);
+			default:
+				return UNKNOW_MIGRATION;
+		}
+	}
+
+	int Rule::rulesAreValid(int migration, const rapidjson::Value &value) {
 		switch (migration) {
 			case NO_MIGRATION:
-				return true;
+				return SUCCESS;
 			case TIME_MIGRATION:
 				return TimeRule::rulesAreValid(value);
 			case RIGHT_MIGRATION:
 				return UserRightRule::rulesAreValid(value);
 			default:
-				return false;
+				return UNKNOW_MIGRATION;
 		}
 	}
 

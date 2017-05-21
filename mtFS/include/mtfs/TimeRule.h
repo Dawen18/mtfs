@@ -20,7 +20,10 @@ namespace mtfs {
 		uint64_t higerLimit;
 
 	public:
-		static bool rulesAreValid(const rapidjson::Value &value);
+		static int copyConfig(rapidjson::Document &source, rapidjson::Value &destination,
+							  rapidjson::Document::AllocatorType &allocator);
+
+		static int rulesAreValid(const rapidjson::Value &value);
 
 		TimeRule(uint64_t lowerLimit, uint64_t higerLimit);
 

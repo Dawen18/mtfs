@@ -27,7 +27,10 @@ namespace mtfs {
 		std::vector<gid_t> gidDenied;
 
 	public:
-		static bool rulesAreValid(const rapidjson::Value &value);
+		static int copyConfig(rapidjson::Document &source, rapidjson::Value &destination,
+							  rapidjson::Document::AllocatorType &allocator);
+
+		static int rulesAreValid(const rapidjson::Value &value);
 
 		void addAllowUid(uid_t uid);
 

@@ -91,7 +91,7 @@ namespace mtfs {
 			return false;
 
 		int mainMigration = mtfs::Rule::NO_MIGRATION;
-		if (system[mtfs::Pool::POOLS].MemberCount() != 1)
+		if (system[Pool::POOLS].MemberCount() != 1)
 			mainMigration = system[mtfs::Rule::MIGRATION].GetInt();
 
 		pluginSystem::PluginManager *pluginManager = pluginSystem::PluginManager::getInstance();

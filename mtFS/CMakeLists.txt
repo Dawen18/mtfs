@@ -47,11 +47,14 @@ set(CONF_SRC
 		src/pluginSystem/PluginManager.cpp
 		)
 
-set(UTILS_HEAD
+set(UTILS
 		include/utils/ThreadQueue.h
-		)
+		include/utils/Fs.h src/utils/Fs.cpp)
 
-add_executable(mtfsCreate ${MTFUSE_SRC} ${MTFUSE_HEAD} ${FS_HEAD} ${FS_SRC} src/main.cpp)
+add_executable(mtfsCreate src/mtfsCreate.cpp
+		${FS_SRC} ${CONF_SRC} ${UTILS}
+		../Plugin/BlockDevice/BlockDevice.cpp
+		)
 target_link_libraries(mtfsCreate fuse3 pthread)
 
 add_definitions(-DDEBUG)
@@ -59,6 +62,6 @@ add_executable(mtfsMount src/mtfsMount.cpp
 		${CONF_HEAD} ${CONF_SRC}
 		${FS_HEAD} ${FS_SRC}
 		${MTFUSE_HEAD} ${MTFUSE_SRC}
-		${UTILS_HEAD}
+		${UTILS}
 		../Plugin/BlockDevice/BlockDevice.cpp)
 target_link_libraries(mtfsMount fuse3 pthread)
