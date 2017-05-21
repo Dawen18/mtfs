@@ -20,6 +20,7 @@ namespace pluginSystem {
 	BlockDevice::BlockDevice() {
 		srand((unsigned int) time(NULL));
 		this->nextFreeInode = 1;
+		this->nextFreeBlock = 1;
 	}
 
 	vector<string> BlockDevice::getInfos() {
@@ -41,6 +42,9 @@ namespace pluginSystem {
 		if (*home.end() != '/')
 			home += '/';
 		string parentDir = home + "BlockDevices/";
+		string bs;
+		bs = params.at("blockSize");
+		this->blockSize = stoi(bs);
 		this->fsType = params.at("fsType");
 		this->devicePath = params.at("devicePath");
 		this->mountpoint = parentDir + this->devicePath.substr(this->devicePath.find('/', 1) + 1);
@@ -71,6 +75,7 @@ namespace pluginSystem {
 		initDirHierarchie();
 
 		initInodes();
+		initBlocks();
 
 		return true;
 	}
@@ -265,20 +270,51 @@ namespace pluginSystem {
 	}
 
 	bool BlockDevice::addBlock(std::uint64_t &blockId) {
-		return false;
+		if (this->freeBlocks.size() == 0) {
+			blockId = this->nextFreeBlock;
+			this->nextFreeBlock++;
+		} else {
+			blockId = this->freeBlocks[this->freeBlocks.size() - 1];
+			this->freeBlocks.pop_back();
+		}
+
+		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
+
+		return createFile(filename);
 	}
 
 	bool BlockDevice::delBlock(std::uint64_t blockId) {
-		(void) blockId;
-		return false;
+		if (this->nextFreeBlock - 1 == blockId)
+			nextFreeBlock--;
+		else
+			this->freeBlocks.push_back(blockId);
+
+
+		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
+
+		return deleteFile(filename);
 	}
 
 	bool BlockDevice::readBlock(std::uint64_t blockId, std::uint8_t *buffer) {
-		return false;
+		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
+		ifstream file(filename);
+		if (!file.is_open())
+			return false;
+
+		file.read((char *) buffer, this->blockSize);
+		file.close();
+		return true;
 	}
 
-	bool BlockDevice::writeBlock(std::uint64_t blockId, std::uint8_t *buffe) {
-		return false;
+	bool BlockDevice::writeBlock(std::uint64_t blockId, std::uint8_t *buffer) {
+		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
+		ofstream file(filename);
+		if (!file.is_open())
+			return false;
+
+		file.write((const char *) buffer, this->blockSize);
+		file.close();
+		return true;
 	}
 
 	bool BlockDevice::readSuperblock(mtfs::superblock_t &superblock) {
@@ -325,6 +361,30 @@ namespace pluginSystem {
 		return;
 	}
 
+	void BlockDevice::initBlocks() {
+		string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/blocks.json";
+		ifstream inodeFile(inodeFilename);
+		if (!inodeFile.is_open())
+			return;
+
+		IStreamWrapper isw(inodeFile);
+
+		Document d;
+		d.ParseStream(isw);
+
+		assert(d.IsObject());
+		assert(d.HasMember("nextFreeBlock"));
+		assert(d.HasMember("freeBlocks"));
+		this->nextFreeBlock = d["nextFreeBlock"].GetUint64();
+		const Value &inodeArray = d["freeBlocks"];
+
+		this->freeBlocks.clear();
+		assert(inodeArray.IsArray());
+		for (SizeType i = 0; i < inodeArray.Size(); i++) {
+			this->freeBlocks.push_back(inodeArray[i].GetUint64());
+		}
+	}
+
 	void BlockDevice::writeMetas() {
 
 //		writeInodeMeta
@@ -351,12 +411,39 @@ namespace pluginSystem {
 		PrettyWriter<StringBuffer> writer(strBuff);
 		d.Accept(writer);
 
-
 		string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/inodes.json";
 		ofstream inodeFile;
 		inodeFile.open(inodeFilename);
 		inodeFile << strBuff.GetString() << endl;
 		inodeFile.close();
+
+//		Write block metas
+		Document db;
+		db.SetObject();
+
+		Document::AllocatorType &blAllocator = db.GetAllocator();
+
+		Value freeBlock(kObjectType);
+		freeBlock.SetUint64(this->nextFreeBlock);
+		db.AddMember(StringRef("nextFreeBlock"), freeBlock, blAllocator);
+
+		Value blockList(kArrayType);
+
+		for (auto b :this->freeBlocks) {
+			blockList.PushBack(Value(b), blAllocator);
+		}
+
+		db.AddMember(StringRef("freeBlocks"), blockList, blAllocator);
+
+		StringBuffer bStrBuff;
+		PrettyWriter<StringBuffer> bWriter(bStrBuff);
+		db.Accept(bWriter);
+
+		string blockFilename = this->mountpoint + "/" + METAS_DIR + "/blocks.json";
+		ofstream blockFile;
+		blockFile.open(blockFilename);
+		blockFile << bStrBuff.GetString() << endl;
+		blockFile.close();
 	}
 
 	void BlockDevice::logError(string message) {

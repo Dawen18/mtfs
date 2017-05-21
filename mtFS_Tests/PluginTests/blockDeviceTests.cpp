@@ -7,6 +7,8 @@
 #include <BlockDevice/BlockDevice.h>
 //#include <mtfs/structs.h>
 
+#define BLOCK_SIZE 4096
+
 using namespace std;
 using namespace pluginSystem;
 
@@ -21,7 +23,7 @@ TEST(BlockDevice, attachDetach) {
 	BlockDevice blockDevice;
 	map<string, string> params;
 	params.insert(make_pair("home", HOME));
-	params.insert(make_pair("blocksize", "4096"));
+	params.insert(make_pair("blockSize", to_string(BLOCK_SIZE)));
 	params.insert(make_pair("devicePath", "/dev/sdd1"));
 	params.insert(make_pair("fsType", "ext4"));
 	ASSERT_TRUE(blockDevice.attach(params));
@@ -39,7 +41,7 @@ public:
 	virtual void SetUp() {
 		map<string, string> params;
 		params.insert(make_pair("home", HOME));
-		params.insert(make_pair("blocksize", "4096"));
+		params.insert(make_pair("blockSize", "4096"));
 		params.insert(make_pair("devicePath", "/dev/sdd1"));
 		params.insert(make_pair("fsType", "ext4"));
 		blockDevice.attach(params);
@@ -173,6 +175,63 @@ TEST_F(BlockDeviceFixture, readInode) {
 	original.size = 2048;
 	blockDevice.writeInode(inodeId, original);
 	ASSERT_TRUE(blockDevice.readInode(inodeId, inode));
+}
+
+TEST_F(BlockDeviceFixture, addBlock) {
+	uint64_t block = 0;
+	ASSERT_TRUE(blockDevice.addBlock(block));
+	ASSERT_NE(0, block);
+
+	uint64_t block2 = 0;
+	ASSERT_TRUE(blockDevice.addBlock(block2));
+	ASSERT_NE(0, block2);
+	ASSERT_GT(block2, block);
+
+	uint64_t block3 = 0;
+	ASSERT_TRUE(blockDevice.addBlock(block3));
+}
+
+TEST_F(BlockDeviceFixture, delBlock) {
+	uint64_t block;
+	blockDevice.addBlock(block);
+	ASSERT_TRUE(blockDevice.delBlock(block));
+
+	uint64_t block2;
+	blockDevice.addBlock(block2);
+	blockDevice.addBlock(block2);
+	blockDevice.addBlock(block2);
+	blockDevice.delBlock(block);
+}
+
+TEST_F(BlockDeviceFixture, writeBlock) {
+	uint8_t block[BLOCK_SIZE];
+	memset(block, 0, BLOCK_SIZE);
+	for (uint8_t i = 0; i < 50; ++i) {
+		block[i] = 'a';
+	}
+
+	uint64_t blockId;
+	blockDevice.addBlock(blockId);
+	ASSERT_TRUE(blockDevice.writeBlock(blockId, block));
+}
+
+TEST_F(BlockDeviceFixture, readBlock) {
+	uint8_t block[BLOCK_SIZE];
+	memset(block, 0, BLOCK_SIZE);
+
+	uint8_t readBlock[BLOCK_SIZE];
+	memset(readBlock, 0, BLOCK_SIZE);
+
+	for (int i = 0; i < 500; ++i) {
+		block[i] = to_string(i)[0];
+	}
+
+	uint64_t blockId;
+	blockDevice.addBlock(blockId);
+	blockDevice.writeBlock(blockId, block);
+
+	ASSERT_TRUE(blockDevice.readBlock(blockId, readBlock));
+	ASSERT_TRUE(0 == memcmp(block, readBlock, BLOCK_SIZE));
 }
 
 int main(int argc, char **argv) {

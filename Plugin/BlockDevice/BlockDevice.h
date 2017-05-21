@@ -41,13 +41,14 @@ namespace pluginSystem {
 
 		bool readBlock(std::uint64_t blockId, std::uint8_t *buffer) override;
 
-		bool writeBlock(std::uint64_t blockId, std::uint8_t *buffe) override;
+		bool writeBlock(std::uint64_t blockId, std::uint8_t *buffer) override;
 
 		bool readSuperblock(mtfs::superblock_t &superblock) override;
 
 		bool writeSuperblock(mtfs::superblock_t &superblock) override;
 
 	private:
+		int blockSize;
 		std::string mountpoint;
 		std::string devicePath;
 		std::string fsType;
@@ -62,6 +63,8 @@ namespace pluginSystem {
 		void initDirHierarchie();
 
 		void initInodes();
+		
+		void initBlocks();
 
 		void writeMetas();
 
