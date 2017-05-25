@@ -8,9 +8,11 @@
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/istreamwrapper.h>
 #include <fstream>
+#include <memory>
 
 #include "BlockDevice.h"
 
+#define DEBUG
 
 using namespace std;
 using namespace rapidjson;
@@ -21,6 +23,11 @@ namespace pluginSystem {
 		srand((unsigned int) time(NULL));
 		this->nextFreeInode = 1;
 		this->nextFreeBlock = 1;
+	}
+
+	BlockDevice::~BlockDevice() {
+		this->freeBlocks.clear();
+		this->freeInodes.clear();
 	}
 
 	vector<string> BlockDevice::getInfos() {
@@ -38,19 +45,18 @@ namespace pluginSystem {
 			return false;
 
 		string home;
-		home = params.at("home");
+		home = params["home"];
 		if (*home.end() != '/')
 			home += '/';
 		string parentDir = home + "BlockDevices/";
-		string bs;
-		bs = params.at("blockSize");
-		this->blockSize = stoi(bs);
-		this->fsType = params.at("fsType");
-		this->devicePath = params.at("devicePath");
+		string bs = params["blockSize"];
+		this->blockSize = stoi(params["blockSize"]);
+		this->fsType = params["fsType"];
+		this->devicePath = params["devicePath"];
 		this->mountpoint = parentDir + this->devicePath.substr(this->devicePath.find('/', 1) + 1);
 
 #ifdef DEBUG
-//		cout << "attach to " << this->mountpoint;
+		//		cout << "attach to " << this->mountpoint;
 #endif
 
 		if (!dirExists(parentDir)) {
@@ -478,3 +484,24 @@ namespace pluginSystem {
 
 
 }  // namespace Plugin
+
+extern "C" pluginSystem::Plugin *createObj() {
+	return new pluginSystem::BlockDevice();
+}
+
+extern "C" void destroyObj(pluginSystem::Plugin *plugin) {
+	delete plugin;
+}
+
+extern "C" pluginSystem::pluginInfo_t getInfo() {
+	vector<string> params;
+	params.push_back("devicePath");
+	params.push_back("fsType");
+
+	pluginSystem::pluginInfo_t info = {
+			.name = "block",
+			.params = params,
+	};
+
+	return info;
+}

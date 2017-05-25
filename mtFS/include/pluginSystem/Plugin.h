@@ -11,6 +11,11 @@
 #include <map>
 
 namespace pluginSystem {
+	typedef struct {
+		std::string name;
+		std::vector<std::string> params;
+	} pluginInfo_t;
+
 	class Plugin {
 	public:
 		static constexpr const char *TYPE = "type";

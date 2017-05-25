@@ -21,6 +21,8 @@ namespace pluginSystem {
 	public:
 		BlockDevice();
 
+		virtual ~BlockDevice();
+
 		std::vector<std::string> getInfos() override;
 
 		bool attach(std::map<std::string, std::string> params) override;

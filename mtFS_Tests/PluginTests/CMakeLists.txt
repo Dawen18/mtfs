@@ -7,3 +7,6 @@ add_definitions(-DDEBUG)
 add_executable(blockTests blockDeviceTests.cpp ${BLOCK_SRCS})
 
 target_link_libraries(blockTests gtest gtest_main)
+
+add_executable(managerTest pluginManagerTest.cpp ../../mtFS/src/pluginSystem/PluginManager.cpp)
+target_link_libraries(managerTest dl boost_system boost_filesystem)

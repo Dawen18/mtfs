@@ -119,8 +119,7 @@ namespace mtfs {
 //					 << endl;
 #endif
 
-				pluginSystem::Plugin *plugin = pluginManager->getPlugin(
-						v.value[pluginSystem::Plugin::TYPE].GetString());
+				pluginSystem::Plugin *plugin = pluginManager->getPlugin(v.value[pluginSystem::Plugin::TYPE].GetString());
 				map<string, string> params;
 				params["home"] = homeDir + "/Plugins";
 
