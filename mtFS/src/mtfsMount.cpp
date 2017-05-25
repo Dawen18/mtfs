@@ -15,9 +15,9 @@
 #include <mtfs/Mtfs.h>
 #include <mtfsFuse/MtfsFuse.h>
 #include <utils/Fs.h>
+#include <boost/filesystem.hpp>
 
 #define HOME_DIR "/home/david/Cours/4eme/Travail_bachelor/Home"
-#define STORAGE_DIR "StorageSystem"
 
 using namespace std;
 using namespace rapidjson;
@@ -25,23 +25,23 @@ using namespace rapidjson;
 int main(int argc, char **argv) {
 	if (!Fs::dirExists(HOME_DIR)) {
 		cerr << "Sorry no configured system found." << endl;
-		cerr
-				<< "Please configure one or recover with -r device_in_system "
-						"where device_in_system is a device wich was in the configuration."
-				<< endl;
+		cerr << "Please configure one or recover with -r device_in_system "
+				"where device_in_system is a device wich was in the configuration." << endl;
 		return -1;
 	}
 
-//	string filename = string(argv[2]) + ".json";
-	string filename = "home.json";
+	string filename = string(argv[argc - 1]) + ".json";
+//	string filename = "home.json";
+	string filepath = string(HOME_DIR) + "/" + mtfs::Mtfs::CONFIG_DIR + "/" + filename;
+	argc--;
 
-	if (!Fs::fileExists(string(HOME_DIR) + "/" + STORAGE_DIR, filename)) {
+	if (!boost::filesystem::exists(filepath)) {
 		cerr << "File not found" << endl;
 		return -1;
 	}
 
 	chdir(HOME_DIR);
-	ifstream file(string(STORAGE_DIR) + "/" + filename);
+	ifstream file(string(mtfs::Mtfs::CONFIG_DIR) + "/" + filename);
 	if (!file.is_open()) {
 		cerr << "error openning file " << strerror(errno) << endl;
 		return -1;

@@ -3,8 +3,9 @@
  * @date 30.04.17.
 **/
 #define FUSE_USE_VERSION 30
-#define HOME_DIR "/home/david/Cours/4eme/Travail_bachelor/Home"
+#define HOME_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/"
 #define CONF_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Configs/"
+#define INSTALL_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Systems/"
 
 #include <option/optionparser.h>
 #include <iostream>
@@ -18,13 +19,15 @@
 #include <mtfs/TimeRule.h>
 #include <mtfs/PoolManager.h>
 #include <algorithm>
+#include <zconf.h>
+#include <boost/filesystem.hpp>
 
 using namespace std;
 
 struct Arg : public option::Arg {
 	static void printError(const char *msg1, const option::Option &opt, const char *msg2) {
 		fprintf(stderr, "ERROR: %s", msg1);
-		fwrite(opt.name, opt.namelen, 1, stderr);
+		fwrite(opt.name, (size_t) opt.namelen, 1, stderr);
 		fprintf(stderr, "%s", msg2);
 	}
 
@@ -60,17 +63,12 @@ enum optionIndex {
 	BSIZE,
 	REDUNDANCY,
 	MIGRATION,
-	LOW,
-	HIGH,
-	USER,
-	GROUP,
-	ALLOW,
-	DENY,
 	POOL,
 	VOLUME,
 	ADD,
 	DEL,
 	CONFIG,
+	INSTALL,
 	HELP
 };
 const option::Descriptor usage[] =
@@ -88,6 +86,7 @@ const option::Descriptor usage[] =
 				{ADD,        0, "",  "add",         Arg::None,         "  \t--add  \tAdd a pool or volume."},
 				{DEL,        0, "",  "del",         Arg::None,         "  \t--del  \tDelete a pool or volume."},
 				{CONFIG,     0, "c", "config",      Arg::NonEmpty,     "  -c[CONFIG], \t--config[=CONFIG]  \tSet config for plugin or migration (json string or filename which contains de json config."},
+				{INSTALL,    0, "",  "install",     Arg::None,         "  -i,  \t--install  \tInstall the config."},
 				{HELP,       0, "h", "help",        option::Arg::None, "  -h, \t--help \tPrint this help and exit."},
 				{UNKNOWN,    0, "",  "",            option::Arg::None, "\nExamples:\n"
 																			   " Create system:\n"
@@ -124,7 +123,6 @@ int main(int argc, char **argv) {
 		return 0;
 	}
 
-	option::Option *o = options[UNKNOWN];
 	for (option::Option *opt = options[UNKNOWN]; opt; opt = opt->next())
 		cerr << "Unknown option: " << opt->name << "\n";
 	if (options[UNKNOWN] != NULL)
@@ -134,6 +132,8 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < parse.nonOptionsCount(); ++i)
 		std::cout << "Non-option #" << i << ": " << parse.nonOption(i) << "\n";
 #endif
+
+	chdir(HOME_DIR);
 
 	rapidjson::Document d;
 	d.SetObject();
@@ -241,7 +241,9 @@ int main(int argc, char **argv) {
 		v.SetInt(mtfs::Rule::TIME_MIGRATION);
 		pool.AddMember(rapidjson::StringRef(mtfs::Rule::MIGRATION), v, allocator);
 
-		addPool(d, pool);
+		int newPoolId = addPool(d, pool);
+		if (newPoolId >= 0)
+			cout << "new pool:" << newPoolId << endl;
 
 	} else if (options[ADD] != NULL && options[POOL] != NULL) {
 //		ADD one volume.
@@ -250,7 +252,7 @@ int main(int argc, char **argv) {
 			return -1;
 		}
 		rapidjson::Value volume(rapidjson::kObjectType);
-
+		rapidjson::Value pool(d[mtfs::Pool::POOLS][options[POOL].arg], allocator);
 		if (options[CONFIG] != NULL) {
 			string arg = options[CONFIG].arg;
 			rapidjson::Document tmpDoc;
@@ -265,17 +267,19 @@ int main(int argc, char **argv) {
 			} else
 				tmpDoc.Parse(arg.c_str());
 
-			if (mtfs::Rule::rulesAreValid(d[mtfs::Rule::MIGRATION].GetInt(), tmpDoc) != mtfs::Rule::VALID_RULES) {
+			int migration = pool[mtfs::Rule::MIGRATION].GetInt();
+
+			if (mtfs::Rule::rulesAreValid(migration, tmpDoc) != mtfs::Rule::VALID_RULES) {
 				cerr << "Invalid config!" << endl;
 				return -1;
 			}
 
-			mtfs::Rule::copyConfig(d[mtfs::Rule::MIGRATION].GetInt(), tmpDoc, volume, allocator);
+			volume = tmpDoc.GetObject();
+//			mtfs::Rule::copyConfig(migration, tmpDoc, volume, allocator);
 		} else {
 
 		}
 
-		rapidjson::Value pool(d[mtfs::Pool::POOLS][options[POOL].arg], allocator);
 
 		int volumeId;
 		rapidjson::Value volumes(rapidjson::kObjectType);
@@ -296,26 +300,34 @@ int main(int argc, char **argv) {
 		pool[mtfs::Volume::VOLUMES] = volumes;
 		d[mtfs::Pool::POOLS][options[POOL].arg] = pool;
 
-		rapidjson::StringBuffer stBuffer;
-		rapidjson::Writer<rapidjson::StringBuffer> writer(stBuffer);
-		d.Accept(writer);
-
-		cout << stBuffer.GetString() << endl;
-
+		cout << "new volume:" << volumeId << endl;
 	}
 
-//	if (options[POOL] != NULL) {
-//
-//	} else {
-//		if (options[ADD] != NULL) {
-//
-//		}
-//	}
 
 #ifndef DEBUG
 	if (mtfs::Mtfs::validate(d))
 #endif
 	writeConfig(d, confName);
+
+	if (options[INSTALL] != NULL) {
+		string filename = confName + ".json";
+		boost::filesystem::create_directory(INSTALL_DIR + confName);
+		string src = string(CONF_DIR) + filename;
+		string dst = string(INSTALL_DIR) + confName + "/" + filename;
+		boost::filesystem::copy_file(src, dst, boost::filesystem::copy_option::overwrite_if_exists);
+		string rootFilename = string(INSTALL_DIR) + confName + "/root.json";
+
+		rapidjson::Document root(rapidjson::kObjectType);
+		mtfs::Mtfs::createRootInode(root);
+
+		rapidjson::StringBuffer sb;
+		rapidjson::PrettyWriter<rapidjson::StringBuffer> pw(sb);
+		root.Accept(pw);
+
+		ofstream configFile(rootFilename);
+		configFile << sb.GetString() << endl;
+		configFile.close();
+	}
 
 	return 0;
 }

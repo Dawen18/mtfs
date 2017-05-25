@@ -55,7 +55,7 @@ add_executable(mtfsCreate src/mtfsCreate.cpp
 		${FS_SRC} ${CONF_SRC} ${UTILS}
 		../Plugin/BlockDevice/BlockDevice.cpp
 		)
-target_link_libraries(mtfsCreate fuse3 pthread)
+target_link_libraries(mtfsCreate fuse3 pthread dl boost_system boost_filesystem)
 
 add_definitions(-DDEBUG)
 add_executable(mtfsMount src/mtfsMount.cpp
@@ -64,4 +64,4 @@ add_executable(mtfsMount src/mtfsMount.cpp
 		${MTFUSE_HEAD} ${MTFUSE_SRC}
 		${UTILS}
 		../Plugin/BlockDevice/BlockDevice.cpp)
-target_link_libraries(mtfsMount fuse3 pthread)
+target_link_libraries(mtfsMount fuse3 pthread dl boost_system boost_filesystem)

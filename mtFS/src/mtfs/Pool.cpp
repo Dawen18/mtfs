@@ -21,7 +21,7 @@ namespace mtfs {
 		}
 
 		for (auto &m: pool[mtfs::Volume::VOLUMES].GetObject()) {
-			if (!Rule::rulesAreValid(migration, m.value))
+			if (Rule::rulesAreValid(migration, m.value) != Rule::VALID_RULES)
 				throw invalid_argument(string("Rules invalid for volume '") + m.name.GetString() + "'!");
 
 			if (!Volume::validate(m.value))

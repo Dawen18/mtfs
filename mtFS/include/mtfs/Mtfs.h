@@ -14,6 +14,7 @@
 namespace mtfs {
 	class Mtfs {
 	public:
+		static constexpr const char *CONFIG_DIR = "Configs";
 		static constexpr const char *INODE_CACHE = "inodeCacheSize";
 		static constexpr const char *DIR_CACHE = "directoryCacheSize";
 		static constexpr const char *BLOCK_CACHE = "blockCacheSize";
@@ -36,6 +37,8 @@ namespace mtfs {
 		static Mtfs *getInstance();
 
 		static bool validate(const rapidjson::Value &system);
+
+		static bool createRootInode(rapidjson::Document &d);
 
 		void setSynchronousQueue(ThreadQueue<std::string> *synchronousQueue);
 

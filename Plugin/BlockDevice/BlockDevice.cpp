@@ -50,7 +50,7 @@ namespace pluginSystem {
 			home += '/';
 		string parentDir = home + "BlockDevices/";
 		string bs = params["blockSize"];
-		this->blockSize = stoi(params["blockSize"]);
+		this->blockSize = stoi(params.at("blockSize"));
 		this->fsType = params["fsType"];
 		this->devicePath = params["devicePath"];
 		this->mountpoint = parentDir + this->devicePath.substr(this->devicePath.find('/', 1) + 1);
@@ -144,6 +144,7 @@ namespace pluginSystem {
 		assert(d.HasMember("gid"));
 		assert(d.HasMember("size"));
 		assert(d.HasMember("linkCount"));
+		assert(d.HasMember("access"));
 		assert(d.HasMember("referenceId"));
 		assert(d.HasMember("dataBlocks"));
 
@@ -152,6 +153,7 @@ namespace pluginSystem {
 		inode.gid = (uint16_t) d["gid"].GetUint();
 		inode.size = d["size"].GetUint64();
 		inode.linkCount = (uint8_t) d["linkCount"].GetUint();
+		inode.access = d["access"].GetUint64();
 
 		const Value &referenceArray = d["referenceId"];
 		assert(referenceArray.IsArray());
@@ -220,6 +222,9 @@ namespace pluginSystem {
 
 		v.SetUint(inode.linkCount);
 		d.AddMember(StringRef("linkCount"), v, alloc);
+
+		v.SetUint64(inode.access);
+		d.AddMember(StringRef("access"), v, alloc);
 
 		Value a(kArrayType);
 

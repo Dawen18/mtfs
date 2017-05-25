@@ -4,6 +4,18 @@ namespace mtfs {
 	int UserRightRule::copyConfig(rapidjson::Document &source, rapidjson::Value &destination,
 								  rapidjson::Document::AllocatorType &allocator) {
 //		TODO copy config
+		if (source.HasMember(ALLOW_USER))
+			destination.AddMember(rapidjson::StringRef(ALLOW_USER), source[ALLOW_USER], allocator);
+
+		if (source.HasMember(DENY_USER))
+			destination.AddMember(rapidjson::StringRef(DENY_USER), source[DENY_USER], allocator);
+
+		if (source.HasMember(ALLOW_GROUP))
+			destination.AddMember(rapidjson::StringRef(ALLOW_GROUP), source[ALLOW_GROUP], allocator);
+
+		if (source.HasMember(DENY_GROUP))
+			destination.AddMember(rapidjson::StringRef(DENY_GROUP), source[DENY_GROUP], allocator);
+
 		return SUCCESS;
 	}
 

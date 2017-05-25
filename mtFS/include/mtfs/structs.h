@@ -27,7 +27,7 @@ namespace mtfs {
 		gid_t gid;
 		uint64_t size;
 		uint8_t linkCount;
-		std::vector<std::uint64_t> access;
+		std::uint64_t access;
 		std::vector<ident_t> referenceId;
 		std::vector<std::vector<ident_t>> dataBlocks;
 
@@ -41,6 +41,8 @@ namespace mtfs {
 			if (size != rhs.size)
 				return false;
 			if (linkCount != rhs.linkCount)
+				return false;
+			if (access != rhs.access)
 				return false;
 
 			if (referenceId.size() != rhs.referenceId.size())

@@ -116,7 +116,7 @@ TEST_F(BlockDeviceFixture, writeInode) {
 	ino.linkCount = 1;
 	ino.referenceId.push_back(rootIdent);
 	ino.referenceId.push_back(oIdent);
-	ino.access.push_back((unsigned long &&) time(nullptr));
+	ino.access = (unsigned long &&) time(nullptr);
 
 	for (int i = 0; i < 4; ++i) {
 		vector<mtfs::ident_t> blocks;
@@ -147,7 +147,7 @@ TEST_F(BlockDeviceFixture, readInode) {
 	original.size = 1024;
 	original.linkCount = 1;
 	original.referenceId.push_back(rootIdent);
-	original.access.push_back((unsigned long &&) time(nullptr));
+	original.access = (unsigned long &&) time(nullptr);
 
 	for (int i = 0; i < 4; ++i) {
 		vector<mtfs::ident_t> blocks;
@@ -223,7 +223,7 @@ TEST_F(BlockDeviceFixture, readBlock) {
 	memset(readBlock, 0, BLOCK_SIZE);
 
 	for (int i = 0; i < 500; ++i) {
-		block[i] = to_string(i)[0];
+		block[i] = (uint8_t) to_string(i)[0];
 	}
 
 	uint64_t blockId;

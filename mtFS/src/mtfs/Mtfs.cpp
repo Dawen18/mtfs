@@ -4,6 +4,7 @@
 
 namespace mtfs {
 	using namespace std;
+	using namespace rapidjson;
 	Mtfs *Mtfs::instance = 0;
 	thread *Mtfs::thr = 0;
 	std::mutex Mtfs::mutex;
@@ -13,7 +14,7 @@ namespace mtfs {
 	////											STATICS															////
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	bool Mtfs::validate(const rapidjson::Value &system) {
+	bool Mtfs::validate(const Value &system) {
 		if (!system.IsObject())
 			throw invalid_argument("Not a object!");
 
@@ -48,12 +49,87 @@ namespace mtfs {
 		}
 
 		for (auto &m: system[Pool::POOLS].GetObject()) {
-			if (!Rule::rulesAreValid(migration, m.value))
+			if (Rule::rulesAreValid(migration, m.value) != Rule::VALID_RULES)
 				throw invalid_argument(string("Rules invalid for pool '") + m.name.GetString() + "'");
 
 			if (!Pool::validate(m.value))
 				throw invalid_argument(string("Pool '") + m.name.GetString() + "' invalid!");
 		}
+
+		return true;
+	}
+
+	bool Mtfs::createRootInode(Document &d) {
+		inode_t inode;
+		memset(&inode, 0, sizeof(inode));
+		inode.linkCount = 1;
+		inode.uid = 0;
+		inode.gid = 0;
+		inode.accesRight = 0777;
+
+		d.SetObject();
+		Document::AllocatorType &alloc = d.GetAllocator();
+
+		Value v;
+
+		v.SetUint(inode.accesRight);
+		d.AddMember(StringRef("accessRight"), v, alloc);
+
+		v.SetUint(inode.uid);
+		d.AddMember(StringRef("uid"), v, alloc);
+
+		v.SetUint(inode.gid);
+		d.AddMember(StringRef("gid"), v, alloc);
+
+		v.SetUint64(inode.size);
+		d.AddMember(StringRef("size"), v, alloc);
+
+		v.SetUint(inode.linkCount);
+		d.AddMember(StringRef("linkCount"), v, alloc);
+
+		v.SetUint64(inode.access);
+		d.AddMember(StringRef("access"), v, alloc);
+
+		Value a(kArrayType);
+
+		for (auto b = inode.referenceId.begin(); b != inode.referenceId.end(); b++) {
+			Value o(kObjectType);
+
+			mtfs::ident_t ident = *b;
+			v.SetUint(ident.poolId);
+			o.AddMember(StringRef("poolId"), v, alloc);
+			v.SetUint(ident.volumeId);
+			o.AddMember(StringRef("volumeId"), v, alloc);
+			v.SetUint64(ident.id);
+			o.AddMember(StringRef("id"), v, alloc);
+
+			a.PushBack(o, alloc);
+		}
+
+		d.AddMember(StringRef("referenceId"), a, alloc);
+
+		Value ba(kArrayType);
+		for (auto b = inode.dataBlocks.begin(); b != inode.dataBlocks.end(); b++) {
+			vector<ident_t> redondancy = *b;
+			Value ra(kArrayType);
+			for (auto be = redondancy.begin(); be != redondancy.end(); be++) {
+				Value ids(kObjectType);
+
+				ident_t ident = *be;
+				v.SetUint(ident.poolId);
+				ids.AddMember(StringRef("poolId"), v, alloc);
+				v.SetUint(ident.volumeId);
+				ids.AddMember(StringRef("volumeId"), v, alloc);
+				v.SetUint64(ident.id);
+				ids.AddMember(StringRef("id"), v, alloc);
+
+				ra.PushBack(ids, alloc);
+			}
+
+			ba.PushBack(ra, alloc);
+		}
+
+		d.AddMember(StringRef("dataBlocks"), ba, alloc);
 
 		return true;
 	}
@@ -86,7 +162,7 @@ namespace mtfs {
 	////											MEMBERS															////
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	bool Mtfs::build(const rapidjson::Value &system, string homeDir) {
+	bool Mtfs::build(const Value &system, string homeDir) {
 		if (!validate(system))
 			return false;
 
@@ -101,7 +177,8 @@ namespace mtfs {
 
 		//	iter pools
 		for (auto &p: system[mtfs::Pool::POOLS].GetObject()) {
-			int poolId = stoi(p.name.GetString());
+			cout << "poolstr " << p.name.GetString() << endl;
+//			int poolId = stoi(p.name.GetString());
 //			cout << "poolId: " << poolId << endl;
 
 			mtfs::Pool *pool = new mtfs::Pool();
@@ -112,16 +189,19 @@ namespace mtfs {
 
 			//		iter volumes
 			for (auto &v: p.value.GetObject()[mtfs::Volume::VOLUMES].GetObject()) {
+				cout << "volstr " << v.name.GetString() << endl;
 
-				int volumeId = stoi(v.name.GetString());
+//				int volumeId = stoi(v.name.GetString());
 #ifdef DEBUG
 //				cout << "\tvolumeId: " << volumeId << " type: " << v.value[pluginSystem::Plugin::TYPE].GetString()
 //					 << endl;
 #endif
 
-				pluginSystem::Plugin *plugin = pluginManager->getPlugin(v.value[pluginSystem::Plugin::TYPE].GetString());
+				pluginSystem::Plugin *plugin = pluginManager->getPlugin(
+						v.value[pluginSystem::Plugin::TYPE].GetString());
 				map<string, string> params;
 				params["home"] = homeDir + "/Plugins";
+				params["blockSize"] = to_string(system[Mtfs::BLOCK_SIZE].GetInt());
 
 				//			Construct params
 				vector<string> neededParams = plugin->getInfos();
@@ -129,6 +209,7 @@ namespace mtfs {
 				for (auto &param: neededParams) {
 					//				cout << param << endl;
 					params[param] = v.value[param.c_str()].GetString();
+					cout << param << " ";
 				}
 
 				if (!plugin->attach(params)) {
