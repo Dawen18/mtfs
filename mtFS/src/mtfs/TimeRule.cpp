@@ -27,4 +27,21 @@ namespace mtfs {
 			return INVALID_RULES;
 		}
 	}
+
+	bool TimeRule::toJson(rapidjson::Value &json, rapidjson::Document::AllocatorType &allocator) {
+
+		rapidjson::Value v;
+
+		if (this->lowerLimit != 0) {
+			v.SetUint64(this->lowerLimit);
+			json.AddMember(rapidjson::StringRef(TIME_LOW_LIMIT), v, allocator);
+		}
+
+		if (this->higerLimit != 0) {
+			v.SetUint64(this->higerLimit);
+			json.AddMember(rapidjson::StringRef(TIME_HIGH_LIMIT), v, allocator);
+		}
+
+		return true;
+	}
 }  // namespace mtfs

@@ -26,6 +26,11 @@ namespace mtfs {
 	public:
 		static bool validate(const rapidjson::Value &pool);
 
+		static void
+		structToJson(const pool_t &pool, rapidjson::Value &dest, rapidjson::Document::AllocatorType &allocator);
+
+		static void jsonToStruct(rapidjson::Value &src, pool_t &pool);
+
 		int addVolume(uint32_t volumeId, Volume *volume, Rule *rule);
 
 		bool addBlock(ruleInfo_t &info, uint16_t &volumeId, uint64_t &blockId);

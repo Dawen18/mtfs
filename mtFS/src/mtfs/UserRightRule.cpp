@@ -1,3 +1,4 @@
+#include <pwd.h>
 #include "mtfs/UserRightRule.h"
 
 namespace mtfs {
@@ -46,5 +47,57 @@ namespace mtfs {
 
 	bool UserRightRule::satisfyRules(ruleInfo_st info) {
 		return false;
+	}
+
+	bool UserRightRule::toJson(rapidjson::Value &json, rapidjson::Document::AllocatorType &allocator) {
+
+		rapidjson::Value v;
+		rapidjson::Value a(rapidjson::kArrayType);
+
+		struct passwd *pw;
+		char buffer[50];
+		memset(buffer, 0, 50 * sizeof(char));
+
+		if (this->uidAllowed.size() != 0) {
+			for (auto &&allowed : this->uidAllowed) {
+				pw = getpwuid(allowed);
+				int len = sprintf(buffer, "%s", pw->pw_name);
+				v.SetString(buffer, (rapidjson::SizeType) len, allocator);
+				a.PushBack(v, allocator);
+			}
+			json.AddMember(rapidjson::StringRef(ALLOW_USER), a, allocator);
+		}
+
+		if (this->uidDenied.size() != 0) {
+			for (auto &&denied : this->uidDenied) {
+				pw = getpwuid(denied);
+				int len = sprintf(buffer, "%s", pw->pw_name);
+				v.SetString(buffer, (rapidjson::SizeType) len, allocator);
+				a.PushBack(v, allocator);
+			}
+			json.AddMember(rapidjson::StringRef(DENY_USER), a, allocator);
+		}
+
+		if (this->gidAllowed.size() != 0) {
+			for (auto &&allowed : this->gidAllowed) {
+				pw = getpwuid(allowed);
+				int len = sprintf(buffer, "%s", pw->pw_name);
+				v.SetString(buffer, (rapidjson::SizeType) len, allocator);
+				a.PushBack(v, allocator);
+			}
+			json.AddMember(rapidjson::StringRef(ALLOW_GROUP), a, allocator);
+		}
+
+		if (this->gidDenied.size() != 0) {
+			for (auto &&denied : this->gidDenied) {
+				pw = getpwuid(denied);
+				int len = sprintf(buffer, "%s", pw->pw_name);
+				v.SetString(buffer, (rapidjson::SizeType) len, allocator);
+				a.PushBack(v, allocator);
+			}
+			json.AddMember(rapidjson::StringRef(DENY_GROUP), a, allocator);
+		}
+
+		return true;
 	}
 }  // namespace mtfs

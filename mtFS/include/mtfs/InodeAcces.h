@@ -7,17 +7,18 @@
 #include <iostream>
 #include <assert.h>
 #include <mtfs/structs.h>
+#include "structs.h"
 
 namespace mtfs {
 	class InodeAcces {
 	public:
-		virtual bool addInode(inode_st &inode)=0;
+		virtual bool addInode(inode_t &inode)=0;
 
-		virtual bool delInode(ident_st inodeId)=0;
+		virtual bool delInode(ident_t inodeId)=0;
 
-		virtual bool getInode(ident_st inodeId, inode_st &inode)=0;
+		virtual bool getInode(ident_t inodeId, inode_t &inode)=0;
 
-		virtual bool setInode(ident_st inodeId, inode_st &inode)=0;
+		virtual bool setInode(ident_t inodeId, inode_t &inode)=0;
 
 	};
 

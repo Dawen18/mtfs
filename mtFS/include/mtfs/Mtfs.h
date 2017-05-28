@@ -8,53 +8,60 @@
 #include <mtfs/BlockAccess.h>
 #include <mtfs/DirectoryEntryAccess.h>
 #include <rapidjson/document.h>
-#include <mutex>
-#include <utils/ThreadQueue.h>
+#include <boost/threadpool.hpp>
+#include <fuse3/fuse_lowlevel.h>
+#include "structs.h"
 
 namespace mtfs {
 	class Mtfs {
 	public:
+		static constexpr const char *SYSTEMS_DIR = "Systems";
 		static constexpr const char *CONFIG_DIR = "Configs";
+
 		static constexpr const char *INODE_CACHE = "inodeCacheSize";
 		static constexpr const char *DIR_CACHE = "directoryCacheSize";
 		static constexpr const char *BLOCK_CACHE = "blockCacheSize";
-		static constexpr const char *BLOCK_SIZE = "blockSize";
+		static constexpr const char *BLOCK_SIZE_ST = "blockSize";
 		static constexpr const char *REDUNDANCY = "redundancy";
 
 	private:
 		static Mtfs *instance;
-		static std::thread *thr;
-		static std::mutex mutex;
-		static bool keepRunning;
+		static boost::threadpool::pool *threadPool;
+		static std::string systemName;
 
 		InodeAcces *inodes;
 		BlockAccess *blocks;
 		DirectoryEntryAccess *dirEntries;
-		ThreadQueue<std::string> *synchronousQueue;
 
 
 	public:
-		static Mtfs *getInstance();
 
 		static bool validate(const rapidjson::Value &system);
 
-		static bool createRootInode(rapidjson::Document &d);
+		static bool createRootInode(inode_t &inode);
 
-		void setSynchronousQueue(ThreadQueue<std::string> *synchronousQueue);
+		static bool start(const rapidjson::Value &system, std::string homeDir, std::string sysName);
 
-		void start();
+		static void stop();
 
-		void join();
+		static void structToJson(const superblock_t &sb, rapidjson::Document &d);
+
+		static void jsonToStruct(rapidjson::Document &d, superblock_t &sb);
+
+		/*						Fuse fcts						*/
+
+		static void getAttr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
+
+	private:
+		static Mtfs *getInstance();
+
+		Mtfs();
 
 		bool build(const rapidjson::Value &system, std::string homeDir);
 
-		void processSynchronous();
+		void stat(fuse_req_t req, fuse_ino_t ino);
 
-
-	private:
-		Mtfs();
-
-		static void loop();
+		int rootStat(struct stat &st);
 	};
 
 }  // namespace mtfs

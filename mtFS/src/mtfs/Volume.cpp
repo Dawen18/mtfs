@@ -23,6 +23,33 @@ namespace mtfs {
 		return true;
 	}
 
+	void Volume::structToJson(const volume_t &volume, rapidjson::Value &dest,
+							  rapidjson::Document::AllocatorType &allocator) {
+		volume.rule->toJson(dest, allocator);
+
+		rapidjson::Value v;
+
+		v.SetString(rapidjson::StringRef(volume.pluginName.c_str()));
+		dest.AddMember(rapidjson::StringRef(pluginSystem::Plugin::TYPE), v, allocator);
+
+		rapidjson::Value p(rapidjson::kObjectType);
+		for (auto &&item : volume.params) {
+			v.SetString(rapidjson::StringRef(item.second.c_str()));
+			p.AddMember(rapidjson::StringRef(item.first.c_str()), v, allocator);
+		}
+		dest.AddMember(rapidjson::StringRef(pluginSystem::Plugin::PARAMS), p, allocator);
+	}
+
+	void Volume::jsonToStruct(rapidjson::Value &src, volume_t &volume) {
+		assert(src.HasMember(pluginSystem::Plugin::TYPE));
+		volume.pluginName = src[pluginSystem::Plugin::TYPE].GetString();
+
+		assert(src.HasMember(pluginSystem::Plugin::PARAMS));
+		for (auto &&item : src[pluginSystem::Plugin::PARAMS].GetObject()) {
+			volume.params.insert(make_pair(item.name.GetString(), item.value.GetString()));
+		}
+	}
+
 	Volume::Volume(pluginSystem::Plugin *plugin) : plugin(plugin) {}
 
 	bool Volume::setTimeLimits(int low, int high) {

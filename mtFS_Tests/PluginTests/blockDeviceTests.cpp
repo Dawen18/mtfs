@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 #include <BlockDevice/BlockDevice.h>
+#include <mtfs/Mtfs.h>
 //#include <mtfs/structs.h>
 
 #define BLOCK_SIZE 4096
@@ -232,6 +233,41 @@ TEST_F(BlockDeviceFixture, readBlock) {
 
 	ASSERT_TRUE(blockDevice.readBlock(blockId, readBlock));
 	ASSERT_TRUE(0 == memcmp(block, readBlock, BLOCK_SIZE));
+}
+
+TEST_F(BlockDeviceFixture, rootInode) {
+	mtfs::inode_t inode;
+	inode.accesRight = 0444;
+	inode.uid = 1000;
+	inode.gid = 1000;
+	inode.size = 1024;
+	inode.linkCount = 2;
+	inode.access = (uint64_t) time(NULL);
+	inode.referenceId.clear();
+	inode.dataBlocks.clear();
+
+	mtfs::inode_t readInode;
+
+	ASSERT_TRUE(blockDevice.writeInode(0, inode));
+	ASSERT_TRUE(blockDevice.readInode(0, readInode));
+	ASSERT_EQ(inode, readInode);
+}
+
+TEST_F(BlockDeviceFixture, superblock) {
+	mtfs::superblock_t superblock;
+	superblock.iCacheSz = superblock.dCacheSz = superblock.bCacheSz = superblock.blockSz = 4096;
+	superblock.migration = superblock.redundancy = 1;
+	superblock.pools.clear();
+	for (int i = 0; i < 5; ++i) {
+		mtfs::pool_t pool;
+		pool.migration = 0;
+		pool.rule = NULL;
+		pool.volumes.clear();
+		superblock.pools[i] = pool;
+	}
+
+
+	ASSERT_TRUE(blockDevice.writeSuperblock(superblock));
 }
 
 int main(int argc, char **argv) {

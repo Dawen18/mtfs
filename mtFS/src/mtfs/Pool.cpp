@@ -31,6 +31,45 @@ namespace mtfs {
 		return true;
 	}
 
+	void Pool::structToJson(const pool_t &pool, rapidjson::Value &dest, rapidjson::Document::AllocatorType &allocator) {
+		dest.AddMember(rapidjson::StringRef(Rule::MIGRATION), rapidjson::Value(pool.migration), allocator);
+
+		pool.rule->toJson(dest, allocator);
+
+		rapidjson::Value volumes(rapidjson::kObjectType);
+		for (auto &&item : pool.volumes) {
+			rapidjson::Value volume(rapidjson::kObjectType);
+
+			Volume::structToJson(item.second, volume, allocator);
+
+			string id = to_string(item.first);
+			rapidjson::Value index(id.c_str(), (rapidjson::SizeType) id.size(), allocator);
+			volumes.AddMember(index, volume, allocator);
+		}
+
+		dest.AddMember(rapidjson::StringRef(Volume::VOLUMES), volumes, allocator);
+	}
+
+	void Pool::jsonToStruct(rapidjson::Value &src, pool_t &pool) {
+		assert(src.HasMember(Rule::MIGRATION));
+		pool.migration = src[Rule::MIGRATION].GetInt();
+
+		assert(src.HasMember(Volume::VOLUMES));
+		for (auto &&item :src[Volume::VOLUMES].GetObject()) {
+			uint32_t id = (uint32_t) stoul(item.name.GetString());
+			volume_t volume;
+			memset(&volume, 0, sizeof(volume_t));
+			volume.params.clear();
+
+			volume.rule = Rule::buildRule(pool.migration, item.value);
+
+			Volume::jsonToStruct(item.value, volume);
+
+			pool.volumes.insert(make_pair(id, volume));
+		}
+
+	}
+
 	int Pool::addVolume(uint32_t volumeId, Volume *volume, Rule *rule) {
 		if (this->volumes.find(volumeId) != this->volumes.end() && this->rules.find(volumeId) != this->rules.end())
 			return VOLUME_ID_EXIST;

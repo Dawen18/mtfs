@@ -18,7 +18,8 @@ namespace pluginSystem {
 
 	class Plugin {
 	public:
-		static constexpr const char *TYPE = "type";
+		static constexpr const char *TYPE = "plName";
+		static constexpr const char *PARAMS = "params";
 
 
 		virtual std::vector<std::string> getInfos()=0;

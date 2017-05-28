@@ -17,7 +17,6 @@ public:
 
 	virtual void SetUp() {
 		d.SetObject();
-		fs = mtfs::Mtfs::getInstance();
 	}
 
 	virtual void TearDown() {
@@ -30,7 +29,6 @@ public:
 
 	rapidjson::Document d;
 	rapidjson::Value v;
-	mtfs::Mtfs *fs;
 };
 
 TEST_F(ConfigFixture, validateTime) {

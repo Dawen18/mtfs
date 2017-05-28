@@ -4,6 +4,7 @@
 **/
 #define FUSE_USE_VERSION 30
 #define HOME_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/"
+#define PLUGIN_HOME "/home/david/Cours/4eme/Travail_bachelor/Home/Plugins/"
 #define CONF_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Configs/"
 #define INSTALL_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Systems/"
 
@@ -21,8 +22,11 @@
 #include <algorithm>
 #include <zconf.h>
 #include <boost/filesystem.hpp>
+#include <pluginSystem/PluginManager.h>
 
 using namespace std;
+using namespace mtfs;
+using namespace rapidjson;
 
 struct Arg : public option::Arg {
 	static void printError(const char *msg1, const option::Option &opt, const char *msg2) {
@@ -100,13 +104,18 @@ const option::Descriptor usage[] =
 
 bool configExist(string name);
 
-void loadConfig(rapidjson::Document &d, string name);
+void loadConfig(superblock_t &sb, string name);
 
-bool writeConfig(rapidjson::Document &d, string confName);
+bool writeConfig(superblock_t &superblock, string confName);
 
-int addPool(rapidjson::Document &d, rapidjson::Value &pool);
+uint32_t addVolume(pool_t &pool, volume_t &volume);
 
-int findMissing(std::vector<int> &x, int number);
+uint32_t addPool(superblock_t &sb, pool_t &pool);
+
+uint32_t findMissing(std::vector<uint32_t> &x, uint32_t number);
+
+void installConfig(superblock_t &superblock, string name);
+
 
 int main(int argc, char **argv) {
 	argc -= (argc > 0);
@@ -119,7 +128,7 @@ int main(int argc, char **argv) {
 		return 1;
 
 	if (options[HELP] || argc == 0) {
-		option::printUsage(cout, usage);
+		option::printUsage(cerr, usage);
 		return 0;
 	}
 
@@ -135,10 +144,10 @@ int main(int argc, char **argv) {
 
 	chdir(HOME_DIR);
 
-	rapidjson::Document d;
-	d.SetObject();
-	rapidjson::Document::AllocatorType &allocator = d.GetAllocator();
-	rapidjson::Value v;
+	superblock_t superblock;
+	memset(&superblock, 0, sizeof(superblock_t));
+	superblock.pools.clear();
+
 	string confName;
 
 //	if option new.
@@ -152,18 +161,10 @@ int main(int argc, char **argv) {
 
 		confName = options[NEW].arg;
 
-		v.SetInt(4096);
-		d.AddMember(rapidjson::StringRef(mtfs::Mtfs::INODE_CACHE), v, allocator);
-		v.SetInt(4096);
-		d.AddMember(rapidjson::StringRef(mtfs::Mtfs::DIR_CACHE), v, allocator);
-		v.SetInt(4096);
-		d.AddMember(rapidjson::StringRef(mtfs::Mtfs::BLOCK_CACHE), v, allocator);
-		v.SetInt(4096);
-		d.AddMember(rapidjson::StringRef(mtfs::Mtfs::BLOCK_SIZE), v, allocator);
-		v.SetInt(1);
-		d.AddMember(rapidjson::StringRef(mtfs::Mtfs::REDUNDANCY), v, allocator);
-		v.SetInt(mtfs::Rule::TIME_MIGRATION);
-		d.AddMember(rapidjson::StringRef(mtfs::Rule::MIGRATION), v, allocator);
+		superblock.iCacheSz = superblock.bCacheSz = superblock.dCacheSz = superblock.blockSz = 4096;
+		superblock.redundancy = 1;
+		superblock.migration = Rule::TIME_MIGRATION;
+
 	} else {
 		confName = parse.nonOption(0);
 		if (!configExist(confName)) {
@@ -175,31 +176,36 @@ int main(int argc, char **argv) {
 		cout << "Load config " << confName << endl;
 #endif
 
-		loadConfig(d, confName);
+		loadConfig(superblock, confName);
 	}
 
-	if (options[ICACHE] != NULL)
-		d[mtfs::Mtfs::INODE_CACHE].SetInt(stoi(options[ICACHE].arg));
+	if (options[ICACHE] != NULL) {
+		superblock.iCacheSz = stoi(options[ICACHE].arg);
+	}
 
-	if (options[DCACHE] != NULL)
-		d[mtfs::Mtfs::DIR_CACHE].SetInt(stoi(options[DCACHE].arg));
+	if (options[DCACHE] != NULL) {
+		superblock.dCacheSz = stoi(options[DCACHE].arg);
+	}
 
-	if (options[BCACHE] != NULL)
-		d[mtfs::Mtfs::BLOCK_CACHE].SetInt(stoi(options[BCACHE].arg));
+	if (options[BCACHE] != NULL) {
+		superblock.bCacheSz = stoi(options[BCACHE].arg);
+	}
 
-	if (options[BSIZE] != NULL)
-		d[mtfs::Mtfs::BLOCK_SIZE].SetInt(stoi(options[BSIZE].arg));
+	if (options[BSIZE] != NULL) {
+		superblock.blockSz = stoi(options[BSIZE].arg);
+	}
 
-	if (options[REDUNDANCY] != NULL)
-		d[mtfs::Mtfs::REDUNDANCY].SetInt(stoi(options[REDUNDANCY].arg));
+	if (options[REDUNDANCY] != NULL) {
+		superblock.redundancy = stoi(options[REDUNDANCY].arg);
+	}
 
 	if (options[MIGRATION] != NULL && options[POOL] == NULL) {
 		string migration = options[MIGRATION].arg;
 
 		if ("time" == migration) {
-			d[mtfs::Rule::MIGRATION].SetInt(mtfs::Rule::TIME_MIGRATION);
+			superblock.migration = Rule::TIME_MIGRATION;
 		} else if ("user" == migration) {
-			d[mtfs::Rule::MIGRATION].SetInt(mtfs::Rule::RIGHT_MIGRATION);
+			superblock.migration = Rule::RIGHT_MIGRATION;
 		} else {
 			cerr << "unknow migration";
 			return -1;
@@ -212,145 +218,134 @@ int main(int argc, char **argv) {
 #ifdef DEBUG
 		cout << "add a pool" << endl;
 #endif
-		rapidjson::Value pool(rapidjson::kObjectType);
+		pool_t pool;
+		pool.migration = Rule::TIME_MIGRATION;
+		pool.volumes.clear();
 
 		if (options[CONFIG] != NULL) {
 			string arg = options[CONFIG].arg;
-			rapidjson::Document tmpDoc;
+			Document tmpDoc;
 #ifdef DEBUG
-			cout << "arg: " << arg << endl;
+			cout << "pool arg: " << arg << endl;
 #endif
 
 			if (arg.substr(arg.length() - 5) == ".json") {
-#ifdef DEBUG
-				cout << "json file" << endl;
-#endif
+//				TODO Parse json file
 			} else
 				tmpDoc.Parse(arg.c_str());
 
-			if (mtfs::Rule::rulesAreValid(d[mtfs::Rule::MIGRATION].GetInt(), tmpDoc) < 0) {
+			if (Rule::rulesAreValid(superblock.migration, tmpDoc) < 0) {
 				cerr << "Invalid config!" << endl;
 				return -1;
 			}
 
-			mtfs::Rule::copyConfig(d[mtfs::Rule::MIGRATION].GetInt(), tmpDoc, pool, allocator);
-		} else {
+			if (tmpDoc.HasMember(Rule::MIGRATION))
+				pool.migration = tmpDoc[Rule::MIGRATION].GetInt();
 
+			pool.rule = Rule::buildRule(superblock.migration, tmpDoc);
+		} else {
+			cerr << "config needed!" << endl;
+			return -1;
 		}
 
-		v.SetInt(mtfs::Rule::TIME_MIGRATION);
-		pool.AddMember(rapidjson::StringRef(mtfs::Rule::MIGRATION), v, allocator);
-
-		int newPoolId = addPool(d, pool);
-		if (newPoolId >= 0)
+		int newPoolId = addPool(superblock, pool);
+		if (newPoolId > 0)
 			cout << "new pool:" << newPoolId << endl;
 
 	} else if (options[ADD] != NULL && options[POOL] != NULL) {
 //		ADD one volume.
-		if (!d[mtfs::Pool::POOLS].HasMember(options[POOL].arg)) {
+		if (superblock.pools.find(stoul(options[POOL].arg)) == superblock.pools.end()) {
 			cerr << "pool '" << options[POOL].arg << "' not found" << endl;
 			return -1;
 		}
-		rapidjson::Value volume(rapidjson::kObjectType);
-		rapidjson::Value pool(d[mtfs::Pool::POOLS][options[POOL].arg], allocator);
+
+		uint32_t poolId = (uint32_t) stoul(options[POOL].arg);
+		volume_t volume;
+		pool_t *pool = &superblock.pools[poolId];
+
 		if (options[CONFIG] != NULL) {
 			string arg = options[CONFIG].arg;
-			rapidjson::Document tmpDoc;
+			Document tmpDoc;
 #ifdef DEBUG
-			cout << "vol arg: " << arg << endl;
+			cout << "pool arg: " << arg << endl;
 #endif
 
 			if (arg.substr(arg.length() - 5) == ".json") {
-#ifdef DEBUG
-				cout << "json file" << endl;
-#endif
+//				TODO Parse json file
 			} else
 				tmpDoc.Parse(arg.c_str());
 
-			int migration = pool[mtfs::Rule::MIGRATION].GetInt();
-
-			if (mtfs::Rule::rulesAreValid(migration, tmpDoc) != mtfs::Rule::VALID_RULES) {
+			if (Rule::rulesAreValid(pool->migration, tmpDoc) < 0) {
 				cerr << "Invalid config!" << endl;
 				return -1;
 			}
 
-			volume = tmpDoc.GetObject();
-//			mtfs::Rule::copyConfig(migration, tmpDoc, volume, allocator);
-		} else {
-
-		}
-
-
-		int volumeId;
-		rapidjson::Value volumes(rapidjson::kObjectType);
-		if (pool.HasMember(mtfs::Volume::VOLUMES)) {
-			volumes = pool[mtfs::Volume::VOLUMES].GetObject();
-			vector<int> idVector;
-			for (auto &m: volumes.GetObject()) {
-				idVector.push_back(stoi(m.name.GetString()));
+			if (!tmpDoc.HasMember(pluginSystem::Plugin::TYPE)) {
+				cerr << "config need a plugin name eg: {\"plName\":\"block\"}" << endl;
+				return -1;
 			}
-			volumeId = findMissing(idVector, 0);
+			volume.pluginName = tmpDoc[pluginSystem::Plugin::TYPE].GetString();
+
+			if (tmpDoc.HasMember(pluginSystem::Plugin::PARAMS)) {
+				for (auto &&param: tmpDoc[pluginSystem::Plugin::PARAMS].GetObject()) {
+					volume.params.insert(make_pair(param.name.GetString(), param.value.GetString()));
+				}
+			}
+
+			volume.rule = Rule::buildRule(pool->migration, tmpDoc);
 		} else {
-			pool.AddMember(rapidjson::StringRef(mtfs::Volume::VOLUMES), volumes, allocator);
-			volumes.SetObject();
-			volumeId = 1;
+			cerr << "config needed!" << endl;
+			return -1;
 		}
 
-		volumes.AddMember(rapidjson::StringRef(to_string(volumeId).c_str()), volume, allocator);
-		pool[mtfs::Volume::VOLUMES] = volumes;
-		d[mtfs::Pool::POOLS][options[POOL].arg] = pool;
-
-		cout << "new volume:" << volumeId << endl;
+		int newVolumeId = addVolume(*pool, volume);
+		if (newVolumeId > 0)
+			cout << "new volume:" << newVolumeId << endl;
 	}
 
-
-#ifndef DEBUG
-	if (mtfs::Mtfs::validate(d))
-#endif
-	writeConfig(d, confName);
+	writeConfig(superblock, confName);
 
 	if (options[INSTALL] != NULL) {
-		string filename = confName + ".json";
-		boost::filesystem::create_directory(INSTALL_DIR + confName);
-		string src = string(CONF_DIR) + filename;
-		string dst = string(INSTALL_DIR) + confName + "/" + filename;
-		boost::filesystem::copy_file(src, dst, boost::filesystem::copy_option::overwrite_if_exists);
-		string rootFilename = string(INSTALL_DIR) + confName + "/root.json";
-
-		rapidjson::Document root(rapidjson::kObjectType);
-		mtfs::Mtfs::createRootInode(root);
-
-		rapidjson::StringBuffer sb;
-		rapidjson::PrettyWriter<rapidjson::StringBuffer> pw(sb);
-		root.Accept(pw);
-
-		ofstream configFile(rootFilename);
-		configFile << sb.GetString() << endl;
-		configFile.close();
+		installConfig(superblock, confName);
 	}
 
 	return 0;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////Definitions//////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 bool configExist(string name) {
 	return Fs::fileExists(CONF_DIR, name + ".json");
 }
 
-void loadConfig(rapidjson::Document &d, string name) {
+void loadConfig(superblock_t &sb, string name) {
 	string filename = string(CONF_DIR) + name + ".json";
 	ifstream file(filename);
 	if (!file.is_open()) {
 		return;
 	}
 
-	rapidjson::IStreamWrapper wrapper(file);
+	IStreamWrapper wrapper(file);
+	Document confFile;
 
-	d.ParseStream(wrapper);
+	confFile.ParseStream(wrapper);
+
+	Mtfs::jsonToStruct(confFile, sb);
 }
 
-bool writeConfig(rapidjson::Document &d, string confName) {
-	rapidjson::StringBuffer sb;
-	rapidjson::PrettyWriter<rapidjson::StringBuffer> pw(sb);
+bool writeConfig(superblock_t &superblock, string confName) {
+	Document d;
+	Document::AllocatorType &allocator = d.GetAllocator();
+	d.SetObject();
+
+	Value v;
+
+	Mtfs::structToJson(superblock, d);
+
+	StringBuffer sb;
+	PrettyWriter<StringBuffer> pw(sb);
 	d.Accept(pw);
 
 	string filename = string(CONF_DIR) + confName + ".json";
@@ -362,32 +357,59 @@ bool writeConfig(rapidjson::Document &d, string confName) {
 }
 
 /**
+ * @brief Add volume in pool
+ * 
+ * @param pool 
+ * @param volume 
+ * 
+ * @return The volume Id
+ */
+uint32_t addVolume(pool_t &pool, volume_t &volume) {
+	uint32_t volumeId = 0;
+	vector<uint32_t> ids;
+	ids.clear();
+
+	for (auto &item  : pool.volumes) {
+		ids.push_back(item.first);
+	}
+	if (ids.size() == 0)
+		volumeId = 1;
+	else
+		volumeId = findMissing(ids, 0);
+
+	if (pool.volumes.find(volumeId) != pool.volumes.end())
+		return 0;
+
+	pool.volumes.insert(make_pair(volumeId, volume));
+
+	return volumeId;
+}
+
+/**
  * @brief add a pool in system
  *
- * @param d 	The json config
- * @param pool 	The json pool to add
+ * @param sb 	The superblock
+ * @param pool 	The pool to add
  *
- * @return
+ * @return the pool id
  */
-int addPool(rapidjson::Document &d, rapidjson::Value &pool) {
-	rapidjson::Value pools(rapidjson::kObjectType);
-	int poolId;
-	if (d.HasMember(mtfs::Pool::POOLS)) {
-		pools = d[mtfs::Pool::POOLS].GetObject();
-		vector<int> idVector;
-		for (auto &m: pools.GetObject()) {
-			idVector.push_back(stoi(m.name.GetString()));
-		}
-		poolId = findMissing(idVector, 0);
-	} else {
-		d.AddMember(rapidjson::StringRef(mtfs::Pool::POOLS), pools, d.GetAllocator());
-		pools.SetObject();
-		poolId = 1;
+uint32_t addPool(superblock_t &sb, pool_t &pool) {
+	uint32_t poolId;
+	vector<uint32_t> ids;
+	ids.clear();
+
+	for (auto &item  : sb.pools) {
+		ids.push_back(item.first);
 	}
+	if (ids.size() == 0)
+		poolId = 1;
+	else
+		poolId = findMissing(ids, 0);
 
-	pools.AddMember(rapidjson::StringRef(to_string(poolId).c_str()), pool, d.GetAllocator());
-	d[mtfs::Pool::POOLS] = pools;
+	if (sb.pools.find(poolId) != sb.pools.end())
+		return 0;
 
+	sb.pools.insert(make_pair(poolId, pool));
 
 	return poolId;
 }
@@ -401,7 +423,7 @@ int addPool(rapidjson::Document &d, rapidjson::Value &pool) {
  * @param number Number from which to search
  * @return The missing number.
  */
-int findMissing(std::vector<int> &x, int number) {
+uint32_t findMissing(std::vector<uint32_t> &x, uint32_t number) {
 	std::sort(x.begin(), x.end());
 	auto pos = std::upper_bound(x.begin(), x.end(), number);
 
@@ -414,3 +436,49 @@ int findMissing(std::vector<int> &x, int number) {
 		return *(pos + (pos2 - diffs.begin() - 1)) + 1;
 	}
 }
+
+void installConfig(superblock_t &superblock, string name) {
+	string filename = "superblock.json";
+	boost::filesystem::create_directory(INSTALL_DIR + name);
+	string src = string(CONF_DIR) + name + ".json";
+	string dst = string(INSTALL_DIR) + name + "/" + filename;
+	boost::filesystem::copy_file(src, dst, boost::filesystem::copy_option::overwrite_if_exists);
+	string rootFilename = string(INSTALL_DIR) + name + "/root.json";
+
+	inode_t rootInode;
+	Mtfs::createRootInode(rootInode);
+
+	Document rootJSON(kObjectType);
+	rootInode.toJson(rootJSON);
+
+//	Attach all plugins for write superblock and rootInode
+//	Only 3 firsts for rootInode
+	pluginSystem::PluginManager *manager = pluginSystem::PluginManager::getInstance();
+	int i = 0;
+	for (auto &&pool: superblock.pools) {
+		for (auto &&volume: pool.second.volumes) {
+			volume.second.params["home"] = PLUGIN_HOME;
+			volume.second.params["blockSize"] = to_string(superblock.blockSz);
+
+			pluginSystem::Plugin *plugin;
+
+			plugin = manager->getPlugin(volume.second.pluginName);
+			plugin->attach(volume.second.params);
+
+			if (i < 3)
+				plugin->writeInode(0, rootInode);
+			plugin->writeSuperblock(superblock);
+
+			i++;
+		}
+	}
+
+	StringBuffer sb;
+	PrettyWriter<StringBuffer> pw(sb);
+	rootJSON.Accept(pw);
+
+	ofstream configFile(rootFilename);
+	configFile << sb.GetString() << endl;
+	configFile.close();
+}
+

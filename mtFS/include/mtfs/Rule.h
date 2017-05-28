@@ -22,6 +22,16 @@
  *
  */
 namespace mtfs {
+
+	typedef struct ruleInfo_st {
+		uint16_t uid;
+
+		uint16_t gid;
+
+		uint64_t previousAccess;
+
+	} ruleInfo_t;
+
 	/**
 	 * @interface
 	 */
@@ -79,6 +89,7 @@ namespace mtfs {
 		 */
 		virtual bool satisfyRules(ruleInfo_st info)=0;
 
+		virtual bool toJson(rapidjson::Value &json, rapidjson::Document::AllocatorType &allocator)=0;
 	};
 
 }  // namespace mtfs

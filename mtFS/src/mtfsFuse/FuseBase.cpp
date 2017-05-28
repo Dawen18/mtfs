@@ -20,7 +20,7 @@ namespace mtfsFuse {
 
 		if (!runPrepare(argc, argv))
 			return -1;
-		std::cout << "run" << std::endl;
+//		std::cout << "run" << std::endl;
 
 		callbacks->setBase(this);
 

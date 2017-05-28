@@ -4,6 +4,7 @@
 #include <iostream>
 #include <assert.h>
 #include <cstring>
+#include <mtfs/Mtfs.h>
 
 #include "mtfsFuse/MtfsFuse.h"
 
@@ -45,40 +46,19 @@ namespace mtfsFuse {
 	}
 
 
-	void MtfsFuse::lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
-		struct fuse_entry_param e;
-
-		if (parent != 1 || strcmp(name, hello_name.c_str()) != 0)
-			fuse_reply_err(req, ENOENT);
-		else {
-			memset(&e, 0, sizeof(e));
-			e.ino = 2;
-			e.attr_timeout = 1.0;
-			e.entry_timeout = 1.0;
-			hello_stat(e.ino, &e.attr);
-
-			fuse_reply_entry(req, &e);
-		}
-
-		threadQueue->push("lookup");
-	}
-
 	void MtfsFuse::getAttr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-		struct stat stbuf;
+		mtfs::Mtfs::getAttr(req,ino,fi);
 
-		(void) fi;
+//		struct stat stbuf;
+//
+//		(void) fi;
+//
+//		memset(&stbuf, 0, sizeof(stbuf));
+//		if (hello_stat(ino, &stbuf) == -1)
+//			fuse_reply_err(req, ENOENT);
+//		else
+//			fuse_reply_attr(req, &stbuf, 1.0);
 
-		memset(&stbuf, 0, sizeof(stbuf));
-		if (hello_stat(ino, &stbuf) == -1)
-			fuse_reply_err(req, ENOENT);
-		else
-			fuse_reply_attr(req, &stbuf, 1.0);
-
-		threadQueue->push("getAttr");
-	}
-
-	void MtfsFuse::setThreadQueue(ThreadQueue<std::string> *threadQueue) {
-		MtfsFuse::threadQueue = threadQueue;
 	}
 
 }  // namespace mtfsFuse

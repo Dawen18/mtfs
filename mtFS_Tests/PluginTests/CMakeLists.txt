@@ -6,7 +6,7 @@ set(BLOCK_SRCS ../../Plugin/BlockDevice/BlockDevice.h ../../Plugin/BlockDevice/B
 add_definitions(-DDEBUG)
 add_executable(blockTests blockDeviceTests.cpp ${BLOCK_SRCS})
 
-target_link_libraries(blockTests gtest gtest_main)
+target_link_libraries(blockTests gtest gtest_main boost_system)
 
 add_executable(managerTest pluginManagerTest.cpp ../../mtFS/src/pluginSystem/PluginManager.cpp)
 target_link_libraries(managerTest dl boost_system boost_filesystem)

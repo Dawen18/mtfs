@@ -9,6 +9,8 @@
 #include <rapidjson/istreamwrapper.h>
 #include <fstream>
 #include <memory>
+#include <mtfs/Mtfs.h>
+#include <mtfs/Pool.h>
 
 #include "BlockDevice.h"
 
@@ -206,67 +208,7 @@ namespace pluginSystem {
 		d.SetObject();
 		Document::AllocatorType &alloc = d.GetAllocator();
 
-		Value v;
-
-		v.SetUint(inode.accesRight);
-		d.AddMember(StringRef("accessRight"), v, alloc);
-
-		v.SetUint(inode.uid);
-		d.AddMember(StringRef("uid"), v, alloc);
-
-		v.SetUint(inode.gid);
-		d.AddMember(StringRef("gid"), v, alloc);
-
-		v.SetUint64(inode.size);
-		d.AddMember(StringRef("size"), v, alloc);
-
-		v.SetUint(inode.linkCount);
-		d.AddMember(StringRef("linkCount"), v, alloc);
-
-		v.SetUint64(inode.access);
-		d.AddMember(StringRef("access"), v, alloc);
-
-		Value a(kArrayType);
-
-		for (auto b = inode.referenceId.begin(); b != inode.referenceId.end(); b++) {
-			Value o(kObjectType);
-
-			mtfs::ident_t ident = *b;
-			v.SetUint(ident.poolId);
-			o.AddMember(StringRef("poolId"), v, alloc);
-			v.SetUint(ident.volumeId);
-			o.AddMember(StringRef("volumeId"), v, alloc);
-			v.SetUint64(ident.id);
-			o.AddMember(StringRef("id"), v, alloc);
-
-			a.PushBack(o, alloc);
-		}
-
-		d.AddMember(StringRef("referenceId"), a, alloc);
-
-		Value ba(kArrayType);
-		for (auto b = inode.dataBlocks.begin(); b != inode.dataBlocks.end(); b++) {
-			vector<ident_t> redondancy = *b;
-			Value ra(kArrayType);
-			for (auto be = redondancy.begin(); be != redondancy.end(); be++) {
-				Value ids(kObjectType);
-
-				ident_t ident = *be;
-				v.SetUint(ident.poolId);
-				ids.AddMember(StringRef("poolId"), v, alloc);
-				v.SetUint(ident.volumeId);
-				ids.AddMember(StringRef("volumeId"), v, alloc);
-				v.SetUint64(ident.id);
-				ids.AddMember(StringRef("id"), v, alloc);
-
-				ra.PushBack(ids, alloc);
-			}
-
-			ba.PushBack(ra, alloc);
-		}
-
-		d.AddMember(StringRef("dataBlocks"), ba, alloc);
-
+		inode.toJson(d);
 
 		StringBuffer sb;
 		PrettyWriter<StringBuffer> pw(sb);
@@ -333,7 +275,11 @@ namespace pluginSystem {
 	}
 
 	bool BlockDevice::writeSuperblock(superblock_t &superblock) {
-		return false;
+		ofstream sbFile(this->mountpoint + "/" + METAS_DIR + "/superblock", ios::binary);
+		sbFile.write((const char *) &superblock, sizeof(superblock));
+		sbFile.close();
+
+		return true;
 	}
 
 	/////////////Private method///////////////

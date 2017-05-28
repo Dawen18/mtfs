@@ -30,7 +30,8 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	string filename = string(argv[argc - 1]) + ".json";
+	string sysName = argv[argc - 1];
+	string filename = sysName + ".json";
 //	string filename = "home.json";
 	string filepath = string(HOME_DIR) + "/" + mtfs::Mtfs::CONFIG_DIR + "/" + filename;
 	argc--;
@@ -57,18 +58,16 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	ThreadQueue<string> *queue = new ThreadQueue<string>();
-
 //	build mtfs
-	mtfs::Mtfs *mtfs = mtfs::Mtfs::getInstance();
-	mtfs->build(d, HOME_DIR);
-	mtfs->setSynchronousQueue(queue);
-	mtfs->start();
+	mtfs::Mtfs::start(d, HOME_DIR, sysName);
 
 //	build mtsfFuse.
 	mtfsFuse::MtfsFuse *mtfsFuse = new mtfsFuse::MtfsFuse();
-	mtfsFuse->setThreadQueue(queue);
 
-	return mtfsFuse->run(argc, argv);
+	int ret = mtfsFuse->run(argc, argv);
+
+	mtfs::Mtfs::stop();
+
+	return ret;
 }
 

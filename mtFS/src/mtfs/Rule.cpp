@@ -1,8 +1,11 @@
-/// \file Rule.cpp
-/// \brief Interface for Rule objects
-/// \author David Wittwer
-/// \version 0.0.1
-/// \date 01.05.17
+/**
+ * @file Rule.cpp
+ * @brief Interface for rules objects
+ * @author David Wittwer
+ * @version 0.0.1
+ * @date 01.05.2017
+ * @copyright 2017
+ */
 
 #include <mtfs/TimeRule.h>
 #include <mtfs/UserRightRule.h>
