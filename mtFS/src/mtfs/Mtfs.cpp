@@ -40,6 +40,19 @@ namespace mtfs {
 		inode_t inode;
 	};
 
+	struct dl_st {
+		const inode_t ino;
+		mutex &mu;
+		bool &continueDl;
+		bool &ended;
+		const Semaphore &sem;
+		union {
+			queue<dirBlock_t *> &dir;
+			queue<uint8_t *> &blk;
+		} fifo;
+		int status;
+	};
+
 	Mtfs *Mtfs::instance = 0;
 	pool *Mtfs::threadPool = 0;
 	string Mtfs::systemName;
@@ -243,9 +256,9 @@ namespace mtfs {
 
 	void Mtfs::destroy(void *userdata) {
 		(void) userdata;
-		uint64_t iptr = (uint64_t) this->inodes;
-		uint64_t dptr = (uint64_t) this->dirBlocks;
-		uint64_t bptr = (uint64_t) this->blocks;
+//		uint64_t iptr = (uint64_t) this->inodes;
+//		uint64_t dptr = (uint64_t) this->dirBlocks;
+//		uint64_t bptr = (uint64_t) this->blocks;
 
 //		if (iptr != dptr && iptr != bptr)
 //			delete this->inodes;
@@ -278,7 +291,78 @@ namespace mtfs {
 	void Mtfs::lookup(fuse_req_t req, fuse_ino_t parent, const string name) {
 		cout << "parent: " << parent << " name: " << name << endl;
 
-		fuse_reply_err(req, ENOENT);
+		internalInode_st *parentInode = this->getIntInode(parent);
+
+		pool dlPool((size_t) this->SIMULT_DL);
+		Semaphore semaphore;
+		queue<dirBlock_t> blkQueue;
+		unsigned long sz1 = blkQueue.size();
+		mutex queueMutex;
+//		dl All blocks
+		for (auto &&blks: parentInode->inode.dataBlocks) {
+			dlPool.schedule(bind(&Mtfs::dlDirBlocks, this, blks, &blkQueue, &queueMutex, &semaphore));
+		}
+
+		vector<ident_t> inodeIds;
+
+		while (1) {
+//			wait valid block
+			semaphore.wait();
+			unique_lock<mutex> lk(queueMutex);
+			dirBlock_t block = blkQueue.front();
+			blkQueue.pop();
+			lk.unlock();
+
+//			id entry is find
+			if (block.entries.end() != block.entries.find(name)) {
+				dlPool.clear();
+				inodeIds = block.entries[name];
+//				delete block;
+				break;
+			}
+
+//			delete block;
+
+//			if queue is empty and pool is empty.
+			lk.lock();
+			if (blkQueue.empty() && dlPool.empty() && 0 == dlPool.active())
+				break;
+
+			lk.unlock();
+		}
+
+		inode_t inode = inode_t();
+		int ret = 1;
+
+		if (0 == inodeIds.size()) {
+			fuse_reply_err(req, ENOENT);
+			return;
+		}
+
+		do {
+			ret = this->inodes->getInode(inodeIds.back(), inode);
+			inodeIds.pop_back();
+			if (inodeIds.empty())
+				break;
+		} while (0 != ret);
+
+//		Send reply to fuse
+		if (0 != ret)
+			fuse_reply_err(req, ret);
+		else {
+			fuse_entry_param param = fuse_entry_param();
+			this->buildParam(inode, param);
+			fuse_reply_entry(req, &param);
+		}
+
+//		free all datas;
+//		dlPool.wait();
+
+//		while (!blkQueue.empty()) {
+//			dirBlock_t *db = blkQueue.front();
+//			blkQueue.pop();
+//			delete db;
+//		}
 	}
 
 	void Mtfs::mknod(fuse_req_t req, fuse_ino_t parent, const std::string name, mode_t mode, dev_t rdev) {
@@ -314,24 +398,8 @@ namespace mtfs {
 		fuse_entry_param param;
 		memset(&param, 0, sizeof(fuse_entry_param));
 
-		param.ino = (fuse_ino_t) inode;
+		this->buildParam(*inode, param);
 
-		param.attr.st_dev = 0;
-		param.attr.st_ino = (ino_t) inode;
-		param.attr.st_mode = inode->accesRight;
-		param.attr.st_nlink = inode->linkCount;
-		param.attr.st_uid = inode->uid;
-		param.attr.st_gid = inode->gid;
-		param.attr.st_size = inode->size;
-		param.attr.st_atim.tv_sec = inode->atime;
-		param.attr.st_ctim.tv_sec = inode->atime;
-		param.attr.st_mtim.tv_sec = inode->atime;
-		param.attr.st_blksize = instance->blockSize;
-		param.attr.st_blocks = inode->dataBlocks.size();
-
-		param.generation = 1;
-		param.attr_timeout = 1.0;
-		param.entry_timeout = 1.0;
 		fuse_reply_entry(req, &param);
 	}
 
@@ -552,6 +620,17 @@ namespace mtfs {
 		return 0;
 	}
 
+	/**
+	 * @brief Add entry in directory.
+	 *
+	 * This function add a new entry in directory and update parent inode if necessary.
+	 *
+	 * @param parentInode 	Directory to add entry
+	 * @param name 			Name of entry
+	 * @param inodeIds 		Inodes od entry
+	 *
+	 * @return 				0 if success else errno.
+	 */
 	int Mtfs::addEntry(internalInode_st *parentInode, std::string name, vector<ident_t> &inodeIds) {
 		int ret = 0;
 
@@ -657,19 +736,59 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Mtfs::insertDirBlock() {
-		return 0;
+//	TODO gérer le cas ou aucun bloc n'a pu être dl.
+	void Mtfs::dlDirBlocks(vector<ident_t> &ids, queue<dirBlock_t> *q, mutex *queueMutex, Semaphore *sem) {
+		int ret = 1;
+		dirBlock_t db = dirBlock_t();
+
+		for (auto &&id: ids) {
+			ret = this->dirBlocks->getDirBlock(id, db);
+			if (SUCCESS == ret)
+				break;
+		}
+
+		if (SUCCESS == ret) {
+			unique_lock<mutex> lk(*queueMutex);
+			q->push(db);
+			sem->notify();
+		}
 	}
 
-	int Mtfs::insertBlock() {
-		return 0;
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	////											UTILS															////
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	internalInode_st *Mtfs::getIntInode(fuse_ino_t ino) {
+		if (FUSE_ROOT_ID == ino)
+			return this->rootIn;
+		else
+			return (internalInode_st *) ino;
+	}
+
+	void Mtfs::buildParam(const inode_t &inode, fuse_entry_param &param) {
+		param.ino = (fuse_ino_t) &inode;
+
+		param.attr.st_dev = 0;
+		param.attr.st_ino = (ino_t) &inode;
+		param.attr.st_mode = inode.accesRight;
+		param.attr.st_nlink = inode.linkCount;
+		param.attr.st_uid = inode.uid;
+		param.attr.st_gid = inode.gid;
+		param.attr.st_size = inode.size;
+		param.attr.st_atim.tv_sec = inode.atime;
+		param.attr.st_ctim.tv_sec = inode.atime;
+		param.attr.st_mtim.tv_sec = inode.atime;
+		param.attr.st_blksize = instance->blockSize;
+		param.attr.st_blocks = inode.dataBlocks.size();
+
+		param.generation = 1;
+		param.attr_timeout = 1.0;
+		param.entry_timeout = 1.0;
 	}
 
 	ruleInfo_t Mtfs::getRuleInfo(const inode_t &inode) {
 		return mtfs::ruleInfo_t(inode.uid, inode.gid, inode.atime);
 	}
-
-//
 
 	inode_t *Mtfs::newInode(const mode_t &mode, const fuse_ctx *ctx) {
 		inode_t *inode = new inode_t();

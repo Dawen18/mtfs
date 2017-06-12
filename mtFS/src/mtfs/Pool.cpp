@@ -97,8 +97,8 @@ namespace mtfs {
 		return false;
 	}
 
-	bool Pool::readInode(uint16_t volumeId, uint64_t inodeId) {
-		return false;
+	int Pool::getInode(const uint32_t &volumeId, const uint64_t &inodeId, inode_t &inode) {
+		return this->volumes[volumeId]->getInode(inodeId, inode);
 	}
 
 	int Pool::putInode(const uint32_t &volumeId, const uint64_t &inodeId, const inode_t &inode) {

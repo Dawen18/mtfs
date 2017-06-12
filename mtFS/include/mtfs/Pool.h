@@ -49,7 +49,7 @@ namespace mtfs {
 
 		bool delInode(uint16_t volumeId, uint64_t inodeId);
 
-		bool readInode(uint16_t volumeId, uint64_t inodeId);
+		int getInode(const uint32_t &volumeId, const uint64_t &inodeId, inode_t &inode);
 
 		int putInode(const uint32_t &volumeId, const uint64_t &inodeId, const inode_t &inode);
 

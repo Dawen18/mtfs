@@ -10,7 +10,7 @@ using namespace std;
 namespace mtfs {
 	Volume::~Volume() {
 		plugin->detach();
-		
+
 		pluginSystem::PluginManager::getInstance()->freePlugin(this->plugin->getName(), this->plugin);
 	}
 

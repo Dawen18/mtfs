@@ -35,7 +35,10 @@ namespace mtfs {
 	}
 
 	int PoolManager::getInode(const ident_t &inodeId, inode_st &inode) {
-		return false;
+
+		int ret = this->pools[inodeId.poolId]->getInode(inodeId.volumeId, inodeId.id, inode);
+
+		return ret;
 	}
 
 	int PoolManager::putInode(const ident_t &inodeId, const inode_t &inode) {

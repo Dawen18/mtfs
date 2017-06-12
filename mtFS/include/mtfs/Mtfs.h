@@ -17,6 +17,7 @@
 
 namespace mtfs {
 	struct internalInode_st;
+	struct dl_st;
 
 	class Mtfs {
 	public:
@@ -31,6 +32,9 @@ namespace mtfs {
 		static constexpr const char *ROOT_INODES = "rootInodes";
 
 	private:
+//		CONFIG
+		static const int SIMULT_DL = 2;
+
 //		REQUEST STATUS CODES
 		static const int SUCCESS = 0;
 		static const int PENDING = 9999;
@@ -101,15 +105,16 @@ namespace mtfs {
 
 		int insertInode(const inode_t &inode, std::vector<ident_t> &idents);
 
-		int insertDirBlock();
+		void dlDirBlocks(std::vector<ident_t> &ids, std::queue<dirBlock_t> *q, std::mutex *queueMutex,
+						 Semaphore *sem);
 
-		int insertBlock();
+		////							UTILS							////
+
+		internalInode_st *getIntInode(fuse_ino_t ino);
+
+		void buildParam(const inode_t &inode, fuse_entry_param &param);
 
 		ruleInfo_t getRuleInfo(const inode_t &inode);
-
-		/////////////////////////////////////
-//		UTILS
-		///////////////////////////////////////////
 
 		static inode_t *newInode(const mode_t &mode, const fuse_ctx *ctx);
 
