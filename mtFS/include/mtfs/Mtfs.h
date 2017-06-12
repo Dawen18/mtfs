@@ -31,6 +31,7 @@ namespace mtfs {
 		static constexpr const char *REDUNDANCY = "redundancy";
 		static constexpr const char *ROOT_INODES = "rootInodes";
 
+
 	private:
 //		CONFIG
 		static const int SIMULT_DL = 2;
@@ -77,6 +78,8 @@ namespace mtfs {
 
 		void getAttr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
 
+		void setAttr(fuse_req_t req, fuse_ino_t ino, struct stat *attr, int toSet, fuse_file_info *fi);
+
 		void lookup(fuse_req_t req, fuse_ino_t parent, const std::string name);
 
 		void mknod(fuse_req_t req, fuse_ino_t parent, const std::string name, mode_t mode, dev_t rdev);
@@ -112,7 +115,11 @@ namespace mtfs {
 
 		internalInode_st *getIntInode(fuse_ino_t ino);
 
+		void getInode(std::vector<ident_t> &ids, inode_t &inode);
+
 		void buildParam(const inode_t &inode, fuse_entry_param &param);
+
+		void buildStat(const internalInode_st &inode, struct stat &st);
 
 		ruleInfo_t getRuleInfo(const inode_t &inode);
 

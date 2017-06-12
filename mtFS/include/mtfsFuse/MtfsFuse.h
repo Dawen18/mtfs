@@ -33,6 +33,8 @@ namespace mtfsFuse {
 		void mknod(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode, dev_t rdev) override;
 
 		void destroy(void *userdata) override;
+
+		void setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr, int to_set, fuse_file_info *fi) override;
 	};
 
 }  // namespace mtfsFuse

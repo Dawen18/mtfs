@@ -28,6 +28,10 @@ namespace mtfsFuse {
 		mtfs::Mtfs::getInstance()->getAttr(req, ino, fi);
 	}
 
+	void MtfsFuse::setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr, int to_set, fuse_file_info *fi) {
+		mtfs::Mtfs::getInstance()->setAttr(req, ino, attr, to_set, fi);
+	}
+
 	void MtfsFuse::lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 		mtfs::Mtfs::getInstance()->lookup(req, parent, name);
 	}

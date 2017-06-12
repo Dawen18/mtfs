@@ -288,6 +288,32 @@ namespace mtfs {
 			threadPool->schedule(bind(&Mtfs::stat, instance, req, ino));
 	}
 
+	void Mtfs::setAttr(fuse_req_t req, fuse_ino_t ino, struct stat *attr, int toSet, fuse_file_info *fi) {
+		(void) fi;
+
+		internalInode_st *inInode = this->getIntInode(ino);
+
+		if (0 != (FUSE_SET_ATTR_MODE & toSet))
+			inInode->inode.accesRight = attr->st_mode;
+
+		if (0 != (FUSE_SET_ATTR_UID & toSet))
+			inInode->inode.uid = attr->st_uid;
+
+		if (0 != (FUSE_SET_ATTR_GID & toSet))
+			inInode->inode.gid = attr->st_gid;
+
+		if (0 != (FUSE_SET_ATTR_SIZE & toSet))
+			inInode->inode.size = (uint64_t) attr->st_size;
+
+		if (0 != (FUSE_SET_ATTR_ATIME & toSet))
+			inInode->inode.atime = (uint64_t) attr->st_atim.tv_sec;
+
+		struct stat st;
+
+		buildStat(*inInode, st);
+		fuse_reply_attr(req, &st, 1.0);
+	}
+
 	void Mtfs::lookup(fuse_req_t req, fuse_ino_t parent, const string name) {
 		cout << "parent: " << parent << " name: " << name << endl;
 
@@ -736,8 +762,18 @@ namespace mtfs {
 		return ret;
 	}
 
-//	TODO gérer le cas ou aucun bloc n'a pu être dl.
+	/**
+	 * @brief dowload or get a directory block.
+	 *
+	 * This function is create for work in a other thread than worker.
+	 *
+	 * @param[in] ids 	Block ids
+	 * @param[out] q 	Queue
+	 * @param[in] queueMutex
+	 * @param[in] sem
+	 */
 	void Mtfs::dlDirBlocks(vector<ident_t> &ids, queue<dirBlock_t> *q, mutex *queueMutex, Semaphore *sem) {
+//	TODO gérer le cas ou aucun bloc n'a pu être dl.
 		int ret = 1;
 		dirBlock_t db = dirBlock_t();
 
@@ -765,6 +801,8 @@ namespace mtfs {
 			return (internalInode_st *) ino;
 	}
 
+	void Mtfs::getInode(vector<ident_t> &ids, inode_t &inode) {}
+
 	void Mtfs::buildParam(const inode_t &inode, fuse_entry_param &param) {
 		param.ino = (fuse_ino_t) &inode;
 
@@ -786,6 +824,23 @@ namespace mtfs {
 		param.entry_timeout = 1.0;
 	}
 
+	void Mtfs::buildStat(const internalInode_st &inode, struct stat &st) {
+		st.st_dev = 0;
+		st.st_ino = (__ino_t) &inode;
+
+		st.st_mode = inode.inode.accesRight;
+		st.st_nlink = inode.inode.linkCount;
+		st.st_uid = inode.inode.uid;
+		st.st_gid = inode.inode.gid;
+		st.st_size = inode.inode.size;
+		time_t time = inode.inode.atime;
+		st.st_atim.tv_sec = time;
+		st.st_ctim.tv_sec = time;
+		st.st_mtim.tv_sec = time;
+		st.st_blksize = this->blockSize;
+		st.st_blocks = inode.inode.dataBlocks.size();
+	}
+
 	ruleInfo_t Mtfs::getRuleInfo(const inode_t &inode) {
 		return mtfs::ruleInfo_t(inode.uid, inode.gid, inode.atime);
 	}
@@ -805,4 +860,6 @@ namespace mtfs {
 	uint64_t Mtfs::now() {
 		return (uint64_t) time(NULL);
 	}
+
+
 }  // namespace mtfs

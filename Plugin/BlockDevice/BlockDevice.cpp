@@ -14,7 +14,7 @@
 
 #include "BlockDevice.h"
 
-#define DEBUG
+//#define DEBUG
 
 using namespace std;
 using namespace rapidjson;
