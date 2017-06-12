@@ -11,61 +11,86 @@
 #include <mtfs/structs.h>
 #include <map>
 #include <queue>
+#include <mutex>
 
 namespace pluginSystem {
 	class BlockDevice : public Plugin {
 		static constexpr const char *INODES_DIR = "inodes";
 		static constexpr const char *BLOCKS_DIR = "blocks";
+		static constexpr const char *DIR_BLOCKS_DIR = "dirBlocks";
 		static constexpr const char *METAS_DIR = "metas";
+		static constexpr const char *BLOCK_METAS_DIR = "metas/block";
+
+		static const int SUCCESS = 0;
 
 	public:
 		BlockDevice();
 
 		virtual ~BlockDevice();
 
-		std::vector<std::string> getInfos() override;
-
 		bool attach(std::map<std::string, std::string> params) override;
 
 		bool detach() override;
 
-		bool addInode(std::uint64_t &inodeId) override;
+		int addInode(uint64_t *inodeId) override;
 
-		bool delInode(std::uint64_t inodeId) override;
+		int delInode(const uint64_t &inodeId) override;
 
-		bool readInode(std::uint64_t inodeId, mtfs::inode_st &inode) override;
+		int getInode(const uint64_t &inodeId, mtfs::inode_st &inode) override;
 
-		bool writeInode(std::uint64_t inodeId, mtfs::inode_st &inode) override;
+		int putInode(const uint64_t &inodeId, const mtfs::inode_st &inode) override;
 
-		bool addBlock(std::uint64_t &blockId) override;
+		int addDirBlock(uint64_t *id) override;
 
-		bool delBlock(std::uint64_t blockId) override;
+		int delDirBlock(const uint64_t &id) override;
 
-		bool readBlock(std::uint64_t blockId, std::uint8_t *buffer) override;
+		int getDirBlock(const uint64_t &id, mtfs::dirBlock_t &block) override;
 
-		bool writeBlock(std::uint64_t blockId, std::uint8_t *buffer) override;
+		int putDirBlock(const uint64_t &id, const mtfs::dirBlock_t &block) override;
 
-		bool readSuperblock(mtfs::superblock_t &superblock) override;
+		int addBlock(uint64_t *blockId) override;
 
-		bool writeSuperblock(mtfs::superblock_t &superblock) override;
+		int delBlock(const uint64_t &blockId) override;
+
+		int getBlock(const uint64_t &blockId, std::uint8_t *buffer) override;
+
+		int putBlock(const uint64_t &blockId, const uint8_t *buffer) override;
+
+		bool getBlockMetas(const uint64_t &blockId, mtfs::blockInfo_t &metas) override;
+
+		bool putBlockMetas(const uint64_t &blockId, const mtfs::blockInfo_t &metas) override;
+
+		bool getSuperblock(mtfs::superblock_t &superblock) override;
+
+		bool putSuperblock(const mtfs::superblock_t &superblock) override;
+
+		std::string getName() override;
 
 	private:
 		int blockSize;
 		std::string mountpoint;
 		std::string devicePath;
 		std::string fsType;
-		
+
+		std::mutex inodeMutex;
 		std::vector<uint64_t> freeInodes;
 		uint64_t nextFreeInode;
-		
-		std::vector<uint64_t > freeBlocks;
+
+		std::mutex dirBlockMutex;
+		std::vector<uint64_t> freeDirBlocks;
+		uint64_t nextFreeDirBlock;
+
+		std::mutex blockMutex;
+		std::vector<uint64_t> freeBlocks;
 		uint64_t nextFreeBlock;
-		
+
 
 		void initDirHierarchie();
 
 		void initInodes();
-		
+
+		void initDirBlocks();
+
 		void initBlocks();
 
 		void writeMetas();
@@ -74,9 +99,9 @@ namespace pluginSystem {
 
 		bool dirExists(std::string path);
 
-		bool createFile(std::string path);
+		int createFile(std::string path);
 
-		bool deleteFile(std::string path);
+		int deleteFile(std::string path);
 
 	};
 

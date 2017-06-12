@@ -21,24 +21,21 @@ using namespace rapidjson;
 using namespace mtfs;
 
 namespace pluginSystem {
-	BlockDevice::BlockDevice() {
+	BlockDevice::BlockDevice() : nextFreeBlock(0), nextFreeDirBlock(0), nextFreeInode(1) {
 		srand((unsigned int) time(NULL));
-		this->nextFreeInode = 1;
-		this->nextFreeBlock = 1;
+		this->freeBlocks.clear();
+		this->freeDirBlocks.clear();
+		this->freeInodes.clear();
 	}
 
 	BlockDevice::~BlockDevice() {
 		this->freeBlocks.clear();
+		this->freeDirBlocks.clear();
 		this->freeInodes.clear();
 	}
 
-	vector<string> BlockDevice::getInfos() {
-		vector<string> infos;
-		infos.push_back("block");
-		infos.push_back("devicePath");
-		infos.push_back("fsType");
-
-		return infos;
+	string BlockDevice::getName() {
+		return "block";
 	}
 
 	bool BlockDevice::attach(std::map<string, string> params) {
@@ -83,6 +80,7 @@ namespace pluginSystem {
 		initDirHierarchie();
 
 		initInodes();
+		initDirBlocks();
 		initBlocks();
 
 		return true;
@@ -90,7 +88,6 @@ namespace pluginSystem {
 
 	bool BlockDevice::detach() {
 		writeMetas();
-
 
 #ifndef DEBUG
 		if (umount(this->mountpoint.c_str()) != 0) {
@@ -103,37 +100,41 @@ namespace pluginSystem {
 		return true;
 	}
 
-	bool BlockDevice::addInode(std::uint64_t &inodeId) {
+	int BlockDevice::addInode(uint64_t *inodeId) {
+		unique_lock<mutex> lk(this->inodeMutex);
 		if (this->freeInodes.size() == 0) {
-			inodeId = this->nextFreeInode;
+			*inodeId = this->nextFreeInode;
 			this->nextFreeInode++;
 		} else {
-			inodeId = this->freeInodes[0];
+			*inodeId = this->freeInodes[0];
 			this->freeInodes.erase(freeInodes.begin());
 		}
+		lk.unlock();
 
-		string filename = this->mountpoint + "/" + INODES_DIR + "/" + to_string(inodeId);
+		string filename = this->mountpoint + "/" + INODES_DIR + "/" + to_string(*inodeId);
 
 		return createFile(filename);
 	}
 
-	bool BlockDevice::delInode(std::uint64_t inodeId) {
+	int BlockDevice::delInode(const uint64_t &inodeId) {
+		unique_lock lk(this->inodeMutex);
 		if (this->nextFreeInode - 1 == inodeId)
 			this->nextFreeInode--;
 		else {
 			this->freeInodes.push_back(inodeId);
 		}
+		lk.unlock();
 
 		string filename = this->mountpoint + "/" + INODES_DIR + "/" + to_string(inodeId);
 
 		return deleteFile(filename);
 	}
 
-	bool BlockDevice::readInode(std::uint64_t inodeId, mtfs::inode_st &inode) {
+	int BlockDevice::getInode(const uint64_t &inodeId, mtfs::inode_st &inode) {
 		string filename = this->mountpoint + "/" + INODES_DIR + "/" + to_string(inodeId);
 		ifstream file(filename);
 		if (!file.is_open())
-			return false;
+			return errno != 0 ? errno : ENOENT;
 
 		IStreamWrapper wrapper(file);
 
@@ -141,41 +142,41 @@ namespace pluginSystem {
 		d.ParseStream(wrapper);
 
 		assert(d.IsObject());
-		assert(d.HasMember("accessRight"));
-		assert(d.HasMember("uid"));
-		assert(d.HasMember("gid"));
-		assert(d.HasMember("size"));
-		assert(d.HasMember("linkCount"));
-		assert(d.HasMember("access"));
-		assert(d.HasMember("referenceId"));
-		assert(d.HasMember("dataBlocks"));
+		assert(d.HasMember(IN_MODE));
+		assert(d.HasMember(IN_UID));
+		assert(d.HasMember(IN_GID));
+		assert(d.HasMember(IN_SIZE));
+		assert(d.HasMember(IN_LINKS));
+		assert(d.HasMember(IN_ACCESS));
+		assert(d.HasMember(IN_REFF));
+		assert(d.HasMember(IN_BLOCKS));
 
-		inode.accesRight = (uint16_t) d["accessRight"].GetUint();
-		inode.uid = (uint16_t) d["uid"].GetUint();
-		inode.gid = (uint16_t) d["gid"].GetUint();
-		inode.size = d["size"].GetUint64();
-		inode.linkCount = (uint8_t) d["linkCount"].GetUint();
-		inode.access = d["access"].GetUint64();
+		inode.accesRight = (uint16_t) d[IN_MODE].GetUint();
+		inode.uid = (uint16_t) d[IN_UID].GetUint();
+		inode.gid = (uint16_t) d[IN_GID].GetUint();
+		inode.size = d[IN_SIZE].GetUint64();
+		inode.linkCount = (uint8_t) d[IN_LINKS].GetUint();
+		inode.atime = d[IN_ACCESS].GetUint64();
 
-		const Value &referenceArray = d["referenceId"];
+		const Value &referenceArray = d[IN_REFF];
 		assert(referenceArray.IsArray());
 		inode.referenceId.clear();
 		for (auto &v : referenceArray.GetArray()) {
 			ident_t ident;
 
 			assert(v.IsObject());
-			assert(v.HasMember("poolId"));
-			assert(v.HasMember("volumeId"));
-			assert(v.HasMember("id"));
+			assert(v.HasMember(ID_POOL));
+			assert(v.HasMember(ID_VOLUME));
+			assert(v.HasMember(ID_ID));
 
-			ident.poolId = (uint16_t) v["poolId"].GetUint();
-			ident.volumeId = (uint16_t) v["volumeId"].GetUint();
-			ident.id = v["id"].GetUint64();
+			ident.poolId = (uint16_t) v[ID_POOL].GetUint();
+			ident.volumeId = (uint16_t) v[ID_VOLUME].GetUint();
+			ident.id = v[ID_ID].GetUint64();
 
 			inode.referenceId.push_back(ident);
 		}
 
-		const Value &dataArray = d["dataBlocks"];
+		const Value &dataArray = d[IN_BLOCKS];
 		assert(dataArray.IsArray());
 		inode.dataBlocks.clear();
 		for (auto &a : dataArray.GetArray()) {
@@ -186,13 +187,13 @@ namespace pluginSystem {
 				ident_t ident;
 
 				assert(v.IsObject());
-				assert(v.HasMember("poolId"));
-				assert(v.HasMember("volumeId"));
-				assert(v.HasMember("id"));
+				assert(v.HasMember(ID_POOL));
+				assert(v.HasMember(ID_VOLUME));
+				assert(v.HasMember(ID_ID));
 
-				ident.poolId = (uint16_t) v["poolId"].GetUint();
-				ident.volumeId = (uint16_t) v["volumeId"].GetUint();
-				ident.id = v["id"].GetUint64();
+				ident.poolId = (uint16_t) v[ID_POOL].GetUint();
+				ident.volumeId = (uint16_t) v[ID_VOLUME].GetUint();
+				ident.id = v[ID_ID].GetUint64();
 
 				redundancy.push_back(ident);
 			}
@@ -200,10 +201,10 @@ namespace pluginSystem {
 			inode.dataBlocks.push_back(redundancy);
 		}
 
-		return true;
+		return this->SUCCESS;
 	}
 
-	bool BlockDevice::writeInode(std::uint64_t inodeId, mtfs::inode_st &inode) {
+	int BlockDevice::putInode(const uint64_t &inodeId, const inode_st &inode) {
 		Document d;
 		d.SetObject();
 		Document::AllocatorType &alloc = d.GetAllocator();
@@ -219,62 +220,207 @@ namespace pluginSystem {
 		inodeFile << sb.GetString() << endl;
 		inodeFile.close();
 
-		return true;
+		return this->SUCCESS;
 	}
 
-	bool BlockDevice::addBlock(std::uint64_t &blockId) {
-		if (this->freeBlocks.size() == 0) {
-			blockId = this->nextFreeBlock;
-			this->nextFreeBlock++;
+	int BlockDevice::addDirBlock(uint64_t *id) {
+		unique_lock lk(this->dirBlockMutex);
+		if (this->freeDirBlocks.size() == 0) {
+			*id = this->nextFreeDirBlock;
+			this->nextFreeDirBlock++;
 		} else {
-			blockId = this->freeBlocks[this->freeBlocks.size() - 1];
-			this->freeBlocks.pop_back();
+			*id = this->freeDirBlocks.front();
+			iter_swap(this->freeDirBlocks.begin(), this->freeDirBlocks.end());
+			this->freeDirBlocks.pop_back();
 		}
+		lk.unlock();
 
-		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
+		string filename = this->mountpoint + "/" + DIR_BLOCKS_DIR + "/" + to_string(*id);
 
 		return createFile(filename);
 	}
 
-	bool BlockDevice::delBlock(std::uint64_t blockId) {
+	int BlockDevice::delDirBlock(const uint64_t &id) {
+		unique_lock lk(this->dirBlockMutex);
+		if (id == this->nextFreeDirBlock - 1)
+			this->nextFreeDirBlock--;
+		else
+			this->freeDirBlocks.push_back(id);
+		lk.unlock();
+
+		string filename = this->mountpoint + "/" + DIR_BLOCKS_DIR + "/" + to_string(id);
+		return deleteFile(filename);
+	}
+
+	int BlockDevice::getDirBlock(const uint64_t &id, dirBlock_t &block) {
+		string filename = this->mountpoint + "/" + DIR_BLOCKS_DIR + "/" + to_string(id);
+		ifstream file(filename);
+		if (!file.is_open())
+			return errno != 0 ? errno : ENOENT;
+
+
+		IStreamWrapper wrapper(file);
+
+		Document d;
+		d.ParseStream(wrapper);
+
+		assert(d.IsObject());
+
+		for (auto &&item: d.GetObject()) {
+			assert(item.value.IsArray());
+
+			vector<ident_t> ids;
+
+			for (auto &&ident: item.value.GetArray()) {
+				ident_t i;
+				i.fromJson(ident);
+				ids.push_back(i);
+			}
+			block.entries.insert(make_pair(item.name.GetString(), ids));
+		}
+		return this->SUCCESS;
+	}
+
+	int BlockDevice::putDirBlock(const uint64_t &id, const dirBlock_t &block) {
+		Document d;
+		d.SetObject();
+
+		Document::AllocatorType &allocator = d.GetAllocator();
+
+		for (auto &&item: block.entries) {
+			Value r(kArrayType);
+			for (auto &&ident: item.second) {
+				Value v(kObjectType);
+				ident.toJson(v, allocator);
+				r.PushBack(v, allocator);
+			}
+			d.AddMember(StringRef(item.first.c_str()), r, allocator);
+		}
+
+		StringBuffer sb;
+		PrettyWriter<StringBuffer> pw(sb);
+		d.Accept(pw);
+
+		string filename = this->mountpoint + "/" + BlockDevice::DIR_BLOCKS_DIR + "/" + to_string(id);
+		ofstream file(filename);
+		if (!file.is_open())
+			return errno != 0 ? errno : ENOENT;
+		file << sb.GetString() << endl;
+		file.close();
+
+		return this->SUCCESS;
+	}
+
+	int BlockDevice::addBlock(uint64_t *blockId) {
+		unique_lock lk(this->blockMutex);
+		if (this->freeBlocks.size() == 0) {
+			*blockId = this->nextFreeBlock;
+			this->nextFreeBlock++;
+		} else {
+			*blockId = this->freeBlocks[this->freeBlocks.size() - 1];
+			this->freeBlocks.pop_back();
+		}
+		lk.unlock();
+
+		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(*blockId);
+
+		return createFile(filename);
+	}
+
+	int BlockDevice::delBlock(const uint64_t &blockId) {
+		unique_lock lk(this->blockMutex);
 		if (this->nextFreeBlock - 1 == blockId)
 			nextFreeBlock--;
 		else
 			this->freeBlocks.push_back(blockId);
-
+		lk.unlock();
 
 		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
 
 		return deleteFile(filename);
 	}
 
-	bool BlockDevice::readBlock(std::uint64_t blockId, std::uint8_t *buffer) {
+	int BlockDevice::getBlock(const uint64_t &blockId, std::uint8_t *buffer) {
 		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
+		ifstream file(filename);
+		if (!file.is_open())
+			return errno != 0 ? errno : ENOENT;
+
+		file.read((char *) buffer, this->blockSize);
+		file.close();
+		return this->SUCCESS;
+	}
+
+	int BlockDevice::putBlock(const uint64_t &blockId, const uint8_t *buffer) {
+		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
+		ofstream file(filename);
+		if (!file.is_open())
+			return errno != 0 ? errno : ENOENT;
+
+		file.write((const char *) buffer, this->blockSize);
+		file.close();
+		return this->SUCCESS;
+	}
+
+	bool BlockDevice::getBlockMetas(const uint64_t &blockId, mtfs::blockInfo_t &metas) {
+		string filename = this->mountpoint + "/" + BLOCK_METAS_DIR + "/" + to_string(blockId) + ".json";
 		ifstream file(filename);
 		if (!file.is_open())
 			return false;
 
-		file.read((char *) buffer, this->blockSize);
-		file.close();
+		IStreamWrapper wrapper(file);
+
+		Document d;
+		d.ParseStream(wrapper);
+
+		assert(d.HasMember(BI_REFF));
+		assert(d[BI_REFF].HasMember(ID_POOL));
+		assert(d[BI_REFF].HasMember(ID_VOLUME));
+		assert(d[BI_REFF].HasMember(ID_ID));
+		assert(d.HasMember(BI_ACCESS));
+
+		metas.referenceId.poolId = d[BI_REFF][ID_POOL].GetUint();
+		metas.referenceId.volumeId = d[BI_REFF][ID_VOLUME].GetUint();
+		metas.referenceId.id = d[BI_REFF][ID_ID].GetUint64();
+		metas.lastAccess = d[BI_ACCESS].GetUint64();
+
 		return true;
 	}
 
-	bool BlockDevice::writeBlock(std::uint64_t blockId, std::uint8_t *buffer) {
-		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
-		ofstream file(filename);
-		if (!file.is_open())
-			return false;
+	bool BlockDevice::putBlockMetas(const uint64_t &blockId, const blockInfo_t &metas) {
+		Document d;
+		d.SetObject();
+		Document::AllocatorType &allocator = d.GetAllocator();
 
-		file.write((const char *) buffer, this->blockSize);
-		file.close();
+		Value v;
+
+		v.SetObject();
+		v.AddMember(StringRef(ID_POOL), Value(metas.referenceId.poolId), allocator);
+		v.AddMember(StringRef(ID_VOLUME), Value(metas.referenceId.volumeId), allocator);
+		v.AddMember(StringRef(ID_ID), Value(metas.referenceId.id), allocator);
+		d.AddMember(StringRef(BI_REFF), v, allocator);
+
+		v.SetUint64(metas.lastAccess);
+		d.AddMember(StringRef(BI_ACCESS), v, allocator);
+
+		StringBuffer bStrBuff;
+		PrettyWriter<StringBuffer> bWriter(bStrBuff);
+		d.Accept(bWriter);
+
+		string blockFilename = this->mountpoint + "/" + BLOCK_METAS_DIR + "/" + to_string(blockId) + ".json";
+		ofstream blockFile;
+		blockFile.open(blockFilename);
+		blockFile << bStrBuff.GetString() << endl;
+		blockFile.close();
+
 		return true;
 	}
 
-	bool BlockDevice::readSuperblock(mtfs::superblock_t &superblock) {
+	bool BlockDevice::getSuperblock(mtfs::superblock_t &superblock) {
 		return false;
 	}
 
-	bool BlockDevice::writeSuperblock(superblock_t &superblock) {
+	bool BlockDevice::putSuperblock(const superblock_t &superblock) {
 		ofstream sbFile(this->mountpoint + "/" + METAS_DIR + "/superblock", ios::binary);
 		sbFile.write((const char *) &superblock, sizeof(superblock));
 		sbFile.close();
@@ -287,10 +433,14 @@ namespace pluginSystem {
 	void BlockDevice::initDirHierarchie() {
 		if (!dirExists(this->mountpoint + "/" + BlockDevice::INODES_DIR))
 			mkdir((this->mountpoint + "/" + BlockDevice::INODES_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + "/" + BlockDevice::DIR_BLOCKS_DIR))
+			mkdir((this->mountpoint + "/" + BlockDevice::DIR_BLOCKS_DIR).c_str(), 0700);
 		if (!dirExists(this->mountpoint + "/" + BlockDevice::BLOCKS_DIR))
 			mkdir((this->mountpoint + "/" + BlockDevice::BLOCKS_DIR).c_str(), 0700);
 		if (!dirExists(this->mountpoint + "/" + BlockDevice::METAS_DIR))
 			mkdir((this->mountpoint + "/" + BlockDevice::METAS_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + "/" + BlockDevice::BLOCK_METAS_DIR))
+			mkdir((this->mountpoint + "/" + BlockDevice::BLOCK_METAS_DIR).c_str(), 0700);
 	}
 
 	void BlockDevice::initInodes() {
@@ -318,6 +468,30 @@ namespace pluginSystem {
 		return;
 	}
 
+	void BlockDevice::initDirBlocks() {
+		string filename = this->mountpoint + "/" + METAS_DIR + "/dirBlocks.json";
+		ifstream inodeFile(filename);
+		if (!inodeFile.is_open())
+			return;
+
+		IStreamWrapper isw(inodeFile);
+
+		Document d;
+		d.ParseStream(isw);
+
+		assert(d.IsObject());
+		assert(d.HasMember("nextFreeDirBlock"));
+		assert(d.HasMember("freeDirBlocks"));
+		this->nextFreeDirBlock = d["nextFreeDirBlock"].GetUint64();
+		const Value &array = d["freeDirBlocks"];
+
+		this->freeDirBlocks.clear();
+		assert(array.IsArray());
+		for (SizeType i = 0; i < array.Size(); i++) {
+			this->freeDirBlocks.push_back(array[i].GetUint64());
+		}
+	}
+
 	void BlockDevice::initBlocks() {
 		string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/blocks.json";
 		ifstream inodeFile(inodeFilename);
@@ -343,64 +517,99 @@ namespace pluginSystem {
 	}
 
 	void BlockDevice::writeMetas() {
-
+		{
 //		writeInodeMeta
-		Document d;
-		d.SetObject();
+			Document d;
+			d.SetObject();
 
-		Document::AllocatorType &allocator = d.GetAllocator();
+			Document::AllocatorType &allocator = d.GetAllocator();
 
-		Value freeInode(kObjectType);
-		freeInode.SetUint64(this->nextFreeInode);
-		d.AddMember(StringRef("nextFreeInode"), freeInode, allocator);
+			Value freeInode(kObjectType);
+			freeInode.SetUint64(this->nextFreeInode);
+			d.AddMember(StringRef("nextFreeInode"), freeInode, allocator);
 
-		Value inodeList(kArrayType);
-		Value inode(kObjectType);
+			Value inodeList(kArrayType);
+			Value inode(kObjectType);
 
-		for (auto b = this->freeInodes.begin(); b != this->freeInodes.end(); b++) {
-			inode.SetUint64(*b);
-			inodeList.PushBack(Value(*b), allocator);
+			for (auto b = this->freeInodes.begin(); b != this->freeInodes.end(); b++) {
+				inode.SetUint64(*b);
+				inodeList.PushBack(Value(*b), allocator);
+			}
+
+			d.AddMember(StringRef("freeInodes"), inodeList, allocator);
+
+			StringBuffer strBuff;
+			PrettyWriter<StringBuffer> writer(strBuff);
+			d.Accept(writer);
+
+			string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/inodes.json";
+			ofstream inodeFile;
+			inodeFile.open(inodeFilename);
+			inodeFile << strBuff.GetString() << endl;
+			inodeFile.close();
 		}
 
-		d.AddMember(StringRef("freeInodes"), inodeList, allocator);
+		{
+//		writeDirBlocksMeta
+			Document d;
+			d.SetObject();
 
-		StringBuffer strBuff;
-		PrettyWriter<StringBuffer> writer(strBuff);
-		d.Accept(writer);
+			Document::AllocatorType &allocator = d.GetAllocator();
 
-		string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/inodes.json";
-		ofstream inodeFile;
-		inodeFile.open(inodeFilename);
-		inodeFile << strBuff.GetString() << endl;
-		inodeFile.close();
+			Value freeInode(kObjectType);
+			freeInode.SetUint64(this->nextFreeDirBlock);
+			d.AddMember(StringRef("nextFreeDirBlock"), freeInode, allocator);
 
+			Value inodeList(kArrayType);
+			Value inode(kObjectType);
+
+			for (auto b = this->freeDirBlocks.begin(); b != this->freeDirBlocks.end(); b++) {
+				inode.SetUint64(*b);
+				inodeList.PushBack(Value(*b), allocator);
+			}
+
+			d.AddMember(StringRef("freeDirBlocks"), inodeList, allocator);
+
+			StringBuffer strBuff;
+			PrettyWriter<StringBuffer> writer(strBuff);
+			d.Accept(writer);
+
+			string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/dirBlocks.json";
+			ofstream inodeFile;
+			inodeFile.open(inodeFilename);
+			inodeFile << strBuff.GetString() << endl;
+			inodeFile.close();
+		}
+
+		{
 //		Write block metas
-		Document db;
-		db.SetObject();
+			Document db;
+			db.SetObject();
 
-		Document::AllocatorType &blAllocator = db.GetAllocator();
+			Document::AllocatorType &blAllocator = db.GetAllocator();
 
-		Value freeBlock(kObjectType);
-		freeBlock.SetUint64(this->nextFreeBlock);
-		db.AddMember(StringRef("nextFreeBlock"), freeBlock, blAllocator);
+			Value freeBlock(kObjectType);
+			freeBlock.SetUint64(this->nextFreeBlock);
+			db.AddMember(StringRef("nextFreeBlock"), freeBlock, blAllocator);
 
-		Value blockList(kArrayType);
+			Value blockList(kArrayType);
 
-		for (auto b :this->freeBlocks) {
-			blockList.PushBack(Value(b), blAllocator);
+			for (auto b :this->freeBlocks) {
+				blockList.PushBack(Value(b), blAllocator);
+			}
+
+			db.AddMember(StringRef("freeBlocks"), blockList, blAllocator);
+
+			StringBuffer bStrBuff;
+			PrettyWriter<StringBuffer> bWriter(bStrBuff);
+			db.Accept(bWriter);
+
+			string blockFilename = this->mountpoint + "/" + METAS_DIR + "/blocks.json";
+			ofstream blockFile;
+			blockFile.open(blockFilename);
+			blockFile << bStrBuff.GetString() << endl;
+			blockFile.close();
 		}
-
-		db.AddMember(StringRef("freeBlocks"), blockList, blAllocator);
-
-		StringBuffer bStrBuff;
-		PrettyWriter<StringBuffer> bWriter(bStrBuff);
-		db.Accept(bWriter);
-
-		string blockFilename = this->mountpoint + "/" + METAS_DIR + "/blocks.json";
-		ofstream blockFile;
-		blockFile.open(blockFilename);
-		blockFile << bStrBuff.GetString() << endl;
-		blockFile.close();
 	}
 
 	void BlockDevice::logError(string message) {
@@ -415,22 +624,22 @@ namespace pluginSystem {
 		else return (info.st_mode & S_IFDIR) != 0;
 	}
 
-	bool BlockDevice::createFile(string path) {
+	int BlockDevice::createFile(string path) {
 		if (creat(path.c_str(), 0600) < 0) {
 			string message = "create " + path + " error " + string(strerror(errno)) + " [" + to_string(errno) + "]";
 			logError(message);
-			return false;
+			return errno;
 		}
-		return true;
+		return this->SUCCESS;
 	}
 
-	bool BlockDevice::deleteFile(std::string path) {
+	int BlockDevice::deleteFile(std::string path) {
 		if (remove(path.c_str()) != 0) {
 			string message = "ERROR: deleting file " + path;
 			logError(message);
-			return false;
+			return errno;
 		}
-		return true;
+		return SUCCESS;
 	}
 
 
