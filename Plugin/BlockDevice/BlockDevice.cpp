@@ -117,7 +117,7 @@ namespace pluginSystem {
 	}
 
 	int BlockDevice::delInode(const uint64_t &inodeId) {
-		unique_lock lk(this->inodeMutex);
+		unique_lock<mutex> lk(this->inodeMutex);
 		if (this->nextFreeInode - 1 == inodeId)
 			this->nextFreeInode--;
 		else {
@@ -224,7 +224,7 @@ namespace pluginSystem {
 	}
 
 	int BlockDevice::addDirBlock(uint64_t *id) {
-		unique_lock lk(this->dirBlockMutex);
+		unique_lock<mutex> lk(this->dirBlockMutex);
 		if (this->freeDirBlocks.size() == 0) {
 			*id = this->nextFreeDirBlock;
 			this->nextFreeDirBlock++;
@@ -241,7 +241,7 @@ namespace pluginSystem {
 	}
 
 	int BlockDevice::delDirBlock(const uint64_t &id) {
-		unique_lock lk(this->dirBlockMutex);
+		unique_lock<mutex> lk(this->dirBlockMutex);
 		if (id == this->nextFreeDirBlock - 1)
 			this->nextFreeDirBlock--;
 		else
@@ -312,7 +312,7 @@ namespace pluginSystem {
 	}
 
 	int BlockDevice::addBlock(uint64_t *blockId) {
-		unique_lock lk(this->blockMutex);
+		unique_lock<mutex> lk(this->blockMutex);
 		if (this->freeBlocks.size() == 0) {
 			*blockId = this->nextFreeBlock;
 			this->nextFreeBlock++;
@@ -328,7 +328,7 @@ namespace pluginSystem {
 	}
 
 	int BlockDevice::delBlock(const uint64_t &blockId) {
-		unique_lock lk(this->blockMutex);
+		unique_lock<mutex> lk(this->blockMutex);
 		if (this->nextFreeBlock - 1 == blockId)
 			nextFreeBlock--;
 		else
