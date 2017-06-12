@@ -30,6 +30,9 @@ namespace mtfs {
 		bool satisfyRules(ruleInfo_st info) override;
 
 		bool toJson(rapidjson::Value &json, rapidjson::Document::AllocatorType &allocator) override;
+
+	private:
+		uint64_t now();
 	};
 
 }  // namespace mtfs

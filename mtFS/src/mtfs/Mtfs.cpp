@@ -1,13 +1,44 @@
-#include <mtfs/Cache.h>
 #include <mtfs/Mtfs.h>
+#include <mtfs/Cache.h>
 #include <pluginSystem/PluginManager.h>
 #include <fstream>
 #include <rapidjson/istreamwrapper.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/prettywriter.h>
+#include <boost/filesystem.hpp>
+#include <grp.h>
+#include <pwd.h>
+#include <mutex>
+#include <condition_variable>
+
+#define HOME "/home/david/Cours/4eme/Travail_bachelor/Home/"
+#define SYSTEMS_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Systems/"
+#define PLUGIN_HOME "/home/david/Cours/4eme/Travail_bachelor/Home/Plugins/"
+
+#define GROUPS_TO_SEARCH 30
+//TODO compute this value in function of entry size
+#define ENTRY_PER_BLOCK 20
 
 namespace mtfs {
 	using namespace std;
 	using namespace rapidjson;
 	using namespace boost::threadpool;
+
+	struct mtfs_req_st {
+		Semaphore *sem;
+		int status;
+
+		mtfs_req_st(int st) : status(st) {}
+
+		~mtfs_req_st() {
+			delete this->sem;
+		}
+	};
+
+	struct internalInode_st {
+		vector<ident_t> idents;
+		inode_t inode;
+	};
 
 	Mtfs *Mtfs::instance = 0;
 	pool *Mtfs::threadPool = 0;
@@ -70,22 +101,26 @@ namespace mtfs {
 	}
 
 	bool Mtfs::createRootInode(inode_t &inode) {
-		inode.accesRight = 0777;
+		inode.accesRight = S_IFDIR | 0775;
 		inode.uid = 0;
-		inode.gid = 0;
-		inode.size = 1024;
+		inode.gid = 1001;
+		inode.size = 0;
 		inode.linkCount = 2;
-		inode.access = (uint64_t) time(NULL);
+		inode.atime = (uint64_t) time(NULL);
 		inode.referenceId.clear();
 		inode.dataBlocks.clear();
 
 		return true;
 	}
 
-	bool Mtfs::start(const rapidjson::Value &system, std::string homeDir, string sysName) {
+	bool Mtfs::start(Document &system, std::string homeDir, string sysName) {
+		(void) homeDir;
 		systemName = sysName;
 
-		if (!validate(system) || !getInstance()->build(system, homeDir))
+		superblock_t superblock;
+		jsonToStruct(system, superblock);
+
+		if (!getInstance()->build(superblock))
 			return false;
 
 		unsigned nbThread = (unsigned int) (thread::hardware_concurrency() * 1.25);
@@ -126,7 +161,7 @@ namespace mtfs {
 		d.AddMember(rapidjson::StringRef(Rule::MIGRATION), v, allocator);
 
 		rapidjson::Value pools(rapidjson::kObjectType);
-		for (auto &&item : sb.pools) {
+		for (auto &&item: sb.pools) {
 			rapidjson::Value pool(rapidjson::kObjectType);
 
 			Pool::structToJson(item.second, pool, allocator);
@@ -136,6 +171,14 @@ namespace mtfs {
 			pools.AddMember(index, pool, allocator);
 		}
 		d.AddMember(rapidjson::StringRef(Pool::POOLS), pools, allocator);
+
+		v.SetArray();
+		for (auto &&id: sb.rootInodes) {
+			Value ident(kObjectType);
+			id.toJson(ident, allocator);
+			v.PushBack(ident, allocator);
+		}
+		d.AddMember(StringRef(ROOT_INODES), v, allocator);
 	}
 
 	void Mtfs::jsonToStruct(rapidjson::Document &d, superblock_t &sb) {
@@ -171,23 +214,13 @@ namespace mtfs {
 
 			sb.pools.insert(make_pair(id, pool));
 		}
-	}
 
-	void Mtfs::getAttr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-		(void) fi;
-
-		if (ino == FUSE_ROOT_ID) {
-//			cout << "root asked" << endl;
-
-			struct stat rootStats;
-			memset(&rootStats, 0, sizeof(struct stat));
-
-			if (instance->rootStat(rootStats) != 0)
-				fuse_reply_err(req, errno);
-
-			fuse_reply_attr(req, &rootStats, 1.0);
-		} else
-			threadPool->schedule(bind(&Mtfs::stat, instance, req, ino));
+		assert(d.HasMember(ROOT_INODES) && d[ROOT_INODES].IsArray());
+		for (auto &&ident: d[ROOT_INODES].GetArray()) {
+			ident_t id;
+			id.fromJson(ident);
+			sb.rootInodes.push_back(id);
+		}
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -195,83 +228,302 @@ namespace mtfs {
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	////											FUSE fcts														////
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	void Mtfs::init(void *userdata, fuse_conn_info *conn) {
+		(void) userdata, conn;
+
+		getInstance()->readRootInode();
+
+#ifdef DEBUG
+		cerr << "[MTFS}: End init" << endl;
+#endif
+	}
+
+	void Mtfs::destroy(void *userdata) {
+		(void) userdata;
+		uint64_t iptr = (uint64_t) this->inodes;
+		uint64_t dptr = (uint64_t) this->dirBlocks;
+		uint64_t bptr = (uint64_t) this->blocks;
+
+//		if (iptr != dptr && iptr != bptr)
+//			delete this->inodes;
+
+//		if (dptr != bptr)
+//			delete this->dirBlocks;
+
+		delete this->blocks;
+	}
+
+	void Mtfs::getAttr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
+		(void) fi;
+
+		chdir(HOME);
+
+		if (ino == FUSE_ROOT_ID) {
+			struct stat rootStats;
+			memset(&rootStats, 0, sizeof(struct stat));
+
+			if (instance->rootStat(rootStats) != 0) {
+				cerr << "[MTFS]: error during root stat" << endl;
+				fuse_reply_err(req, errno);
+			}
+
+			fuse_reply_attr(req, &rootStats, 1.0);
+		} else
+			threadPool->schedule(bind(&Mtfs::stat, instance, req, ino));
+	}
+
+	void Mtfs::lookup(fuse_req_t req, fuse_ino_t parent, const string name) {
+		cout << "parent: " << parent << " name: " << name << endl;
+
+		fuse_reply_err(req, ENOENT);
+	}
+
+	void Mtfs::mknod(fuse_req_t req, fuse_ino_t parent, const std::string name, mode_t mode, dev_t rdev) {
+		(void) rdev;
+
+		int ret;
+
+		internalInode_st *parentInode = nullptr;
+
+		if (parent == FUSE_ROOT_ID) {
+			parentInode = this->rootIn;
+		} else {
+			parentInode = (internalInode_st *) parent;
+		}
+
+//		Create and write new inode
+		inode_t *inode = this->newInode(mode, fuse_req_ctx(req));
+		vector<ident_t> inodeIdents;
+		if (0 != (ret = this->insertInode(*inode, inodeIdents))) {
+			delete inode;
+			fuse_reply_err(req, ret);
+			return;
+		}
+
+//			Add entry in dir
+		if (0 != (ret = this->addEntry(parentInode, name, inodeIdents))) {
+			delete inode;
+			fuse_reply_err(req, ret);
+			return;
+		}
+
+//			reply to fuse
+		fuse_entry_param param;
+		memset(&param, 0, sizeof(fuse_entry_param));
+
+		param.ino = (fuse_ino_t) inode;
+
+		param.attr.st_dev = 0;
+		param.attr.st_ino = (ino_t) inode;
+		param.attr.st_mode = inode->accesRight;
+		param.attr.st_nlink = inode->linkCount;
+		param.attr.st_uid = inode->uid;
+		param.attr.st_gid = inode->gid;
+		param.attr.st_size = inode->size;
+		param.attr.st_atim.tv_sec = inode->atime;
+		param.attr.st_ctim.tv_sec = inode->atime;
+		param.attr.st_mtim.tv_sec = inode->atime;
+		param.attr.st_blksize = instance->blockSize;
+		param.attr.st_blocks = inode->dataBlocks.size();
+
+		param.generation = 1;
+		param.attr_timeout = 1.0;
+		param.entry_timeout = 1.0;
+		fuse_reply_entry(req, &param);
+	}
+
+	void Mtfs::access(fuse_req_t req, fuse_ino_t ino, int mask) {
+
+		const struct fuse_ctx *context = fuse_req_ctx(req);
+
+		if (FUSE_ROOT_ID == ino) {
+			int ret = EACCES;
+			inode_t inode = instance->getRootInode();
+			if (context->uid == inode.uid) {
+				if ((mask << 6 & inode.accesRight) != 0)
+					ret = 0;
+				else {
+					cerr << "[MTFS]: bad user right: " << (inode.accesRight & (mask << 6)) << endl;
+				}
+			} else {
+
+//			get all user groups;
+				size_t bufsize = (size_t) sysconf(_SC_GETPW_R_SIZE_MAX);
+				if (bufsize == -1)
+					bufsize = 16384;
+
+				char *buf = (char *) malloc(bufsize * sizeof(char));
+				if (buf == NULL) {
+					fuse_reply_err(req, ENOMEM);
+					free(buf);
+					return;
+				}
+
+				struct passwd pwd, *result;
+				int s = getpwuid_r(context->uid, &pwd, buf, bufsize, &result);
+				if (NULL == result) {
+					int err;
+					if (0 == s)
+						err = EAGAIN;
+					else
+						err = s;
+					fuse_reply_err(req, err);
+					free(buf);
+					return;
+				}
+
+				int ngroups = GROUPS_TO_SEARCH;
+				gid_t *groups = (gid_t *) malloc(ngroups * sizeof(gid_t));
+				if (getgrouplist(pwd.pw_name, pwd.pw_gid, groups, &ngroups) == -1) {
+					cerr << "get group list error. ngoups " << ngroups << endl;
+					free(buf);
+					free(groups);
+				}
+
+				if (find(groups, groups + ngroups, inode.gid) != groups + ngroups) {
+					if ((mask << 3 & inode.accesRight) != 0)
+						ret = 0;
+				} else {
+					if ((mask & inode.accesRight) != 0)
+						ret = 0;
+				}
+
+				free(buf);
+				free(groups);
+			}
+
+			fuse_reply_err(req, ret);
+
+
+		} else {
+			fuse_reply_err(req, ENOSYS);
+		}
+	}
+
+	void Mtfs::opendir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
+		(void) ino, fi;
+		fuse_reply_open(req, fi);
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////											PRIVATE															////
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	Mtfs::Mtfs() {
+	Mtfs::Mtfs() : redundancy(1), maxEntryPerBlock(ENTRY_PER_BLOCK) {
+		this->inodes = nullptr;
+		this->dirBlocks = nullptr;
+		this->blocks = nullptr;
+		this->rootIn = new internalInode_st();
 	}
 
-	bool Mtfs::build(const Value &system, string homeDir) {
+	inode_t Mtfs::getRootInode() {
+		return this->rootIn->inode;
+//		return this->rootInode;
+	}
 
-		int mainMigration = mtfs::Rule::NO_MIGRATION;
-		if (system[Pool::POOLS].MemberCount() != 1)
-			mainMigration = system[mtfs::Rule::MIGRATION].GetInt();
+	bool Mtfs::build(const superblock_t &superblock) {
 
-		pluginSystem::PluginManager *pluginManager = pluginSystem::PluginManager::getInstance();
+		this->redundancy = superblock.redundancy;
+		this->blockSize = superblock.blockSz;
+		this->rootIn->idents = superblock.rootInodes;
 
-		//	Instatiate classes
-		mtfs::PoolManager *poolManager = new mtfs::PoolManager();
+		pluginSystem::PluginManager *manager = pluginSystem::PluginManager::getInstance();
 
-		//	iter pools
-		for (auto &p: system[mtfs::Pool::POOLS].GetObject()) {
-#ifdef DEBUG
-//			cout << "poolstr " << p.name.GetString() << endl;
-//			int poolId = stoi(p.name.GetString());
-//			cout << "poolId: " << poolId << endl;
-#endif
+		PoolManager *poolManager = new PoolManager();
+		for (auto &&poolSt: superblock.pools) {
+			Pool *pool = new Pool();
 
-			mtfs::Pool *pool = new mtfs::Pool();
+			for (auto volSt: poolSt.second.volumes) {
+				volSt.second.params.insert(make_pair("home", PLUGIN_HOME));
+				volSt.second.params.insert(make_pair("blockSize", to_string(this->blockSize)));
 
-			int volMigration = mtfs::Rule::NO_MIGRATION;
-			if (p.value[mtfs::Volume::VOLUMES].MemberCount() != 1)
-				volMigration = p.value[mtfs::Rule::MIGRATION].GetInt();
+				pluginSystem::Plugin *plugin = manager->getPlugin(volSt.second.pluginName);
 
-			//		iter volumes
-			for (auto &v: p.value.GetObject()[mtfs::Volume::VOLUMES].GetObject()) {
-
-//				int volumeId = stoi(v.name.GetString());
-#ifdef DEBUG
-//				cout << "volstr " << v.name.GetString() << endl;
-//				cout << "\tvolumeId: " << volumeId << " type: " << v.value[pluginSystem::Plugin::TYPE].GetString()
-//					 << endl;
-#endif
-
-				pluginSystem::Plugin *plugin = pluginManager->getPlugin(
-						v.value[pluginSystem::Plugin::TYPE].GetString());
-				map<string, string> params;
-				params["home"] = homeDir + "/Plugins";
-				params["blockSize"] = to_string(system[Mtfs::BLOCK_SIZE_ST].GetInt());
-
-				//			Construct params
-				vector<string> neededParams = plugin->getInfos();
-				neededParams.erase(neededParams.begin());
-				for (auto &param: neededParams) {
-//					cout << param << endl;
-					params[param] = v.value[param.c_str()].GetString();
-//					cout << param << " ";
+				if (!plugin->attach(volSt.second.params)) {
+					cerr << "Failed attach plugin " << volSt.second.pluginName << endl;
 				}
 
-				if (!plugin->attach(params)) {
-					cerr << "Failed to attach plugin " << plugin->getInfos()[0] << endl;
-					delete (plugin);
-
-					return -1;
-				}
-
-				mtfs::Volume *volume = new mtfs::Volume(plugin);
-
-				pool->addVolume((uint32_t) stoul(v.name.GetString()), volume,
-								mtfs::Rule::buildRule(volMigration, v.value));
+				pool->addVolume(volSt.first, new Volume(plugin), volSt.second.rule);
 			}
-			poolManager->addPool((uint32_t) stoul(p.name.GetString()), pool,
-								 mtfs::Rule::buildRule(mainMigration, p.value));
+
+			poolManager->addPool(poolSt.first, pool, poolSt.second.rule);
 		}
 
 		this->inodes = poolManager;
-		this->dirEntries = poolManager;
+		this->dirBlocks = poolManager;
 		this->blocks = poolManager;
 
 		return true;
+	}
+
+	void Mtfs::readRootInode() {
+		string filename = string(SYSTEMS_DIR) + "/" + systemName + "/root.json";
+		ifstream file(filename);
+		if (!file.is_open())
+			return;
+
+		IStreamWrapper wrapper(file);
+
+		Document d(kObjectType);
+		d.ParseStream(wrapper);
+
+		assert(d.HasMember(IN_MODE));
+		this->rootIn->inode.accesRight = d[IN_MODE].GetUint();
+
+		assert(d.HasMember(IN_LINKS));
+		this->rootIn->inode.linkCount = (uint8_t) d[IN_LINKS].GetUint();
+
+		assert(d.HasMember(IN_UID));
+		this->rootIn->inode.uid = d[IN_UID].GetUint();
+
+		assert(d.HasMember(IN_GID));
+		this->rootIn->inode.gid = d[IN_GID].GetUint();
+
+		assert(d.HasMember(IN_SIZE));
+		this->rootIn->inode.size = d[IN_SIZE].GetUint64();
+
+		assert(d.HasMember(IN_ACCESS));
+		this->rootIn->inode.atime = d[IN_ACCESS].GetUint64();
+
+		this->rootIn->inode.referenceId.clear();
+
+		assert(d.HasMember(IN_BLOCKS));
+		for (auto &&item: d[IN_BLOCKS].GetArray()) {
+			vector<ident_t> blocksRedundancy;
+			for (auto &&block: item.GetArray()) {
+				ident_t ident;
+
+				assert(block.HasMember(ID_POOL));
+				ident.poolId = block[ID_POOL].GetUint();
+
+				assert(block.HasMember(ID_VOLUME));
+				ident.volumeId = block[ID_VOLUME].GetUint();
+
+				assert(block.HasMember(ID_ID));
+				ident.id = block[ID_ID].GetUint64();
+
+				blocksRedundancy.push_back(ident);
+			}
+			this->rootIn->inode.dataBlocks.push_back(blocksRedundancy);
+		}
+	}
+
+	void Mtfs::writeRootInode() {
+		Document d;
+
+		this->rootIn->inode.toJson(d);
+
+		StringBuffer sb;
+		PrettyWriter<StringBuffer> pw(sb);
+		d.Accept(pw);
+
+		string filename = string(SYSTEMS_DIR) + "/" + systemName + "/root.json";
+		ofstream rootFile(filename);
+		rootFile << sb.GetString() << endl;
+		rootFile.close();
 	}
 
 	void Mtfs::stat(fuse_req_t req, fuse_ino_t ino) {
@@ -281,42 +533,157 @@ namespace mtfs {
 	}
 
 	int Mtfs::rootStat(struct stat &st) {
-		string filename = string(SYSTEMS_DIR) + "/" + systemName + "/root.json";
-		ifstream file(filename);
-		if (!file.is_open())
-			return -1;
-
-		IStreamWrapper wrapper(file);
-
-		Document d(kObjectType);
-		d.ParseStream(wrapper);
-
 
 		st.st_dev = 0;
-		st.st_ino = 0;
+		st.st_ino = FUSE_ROOT_ID;
 
-		assert(d.HasMember(IN_MODE));
-		st.st_ino = d[IN_MODE].GetUint();
-
-		assert(d.HasMember(IN_LINKS));
-		st.st_nlink = d[IN_LINKS].GetUint();
-
-		assert(d.HasMember(IN_UID));
-		st.st_uid = d[IN_UID].GetUint();
-
-		assert(d.HasMember(IN_GID));
-		st.st_gid = d[IN_GID].GetUint();
-
-		st.st_size = 1024;
-
-		assert(d.HasMember(IN_ACCESS));
-		time_t time = d[IN_ACCESS].GetUint64();
+		st.st_mode = this->rootIn->inode.accesRight;
+		st.st_nlink = this->rootIn->inode.linkCount;
+		st.st_uid = this->rootIn->inode.uid;
+		st.st_gid = this->rootIn->inode.gid;
+		st.st_size = this->rootIn->inode.size;
+		time_t time = this->rootIn->inode.atime;
 		st.st_atim.tv_sec = time;
 		st.st_ctim.tv_sec = time;
 		st.st_mtim.tv_sec = time;
-
+		st.st_blksize = this->blockSize;
+		st.st_blocks = this->rootIn->inode.dataBlocks.size();
 
 		return 0;
 	}
 
+	int Mtfs::addEntry(internalInode_st *parentInode, std::string name, vector<ident_t> &inodeIds) {
+		int ret = 0;
+
+		dirBlock_t dirBlock = dirBlock_t();
+
+		vector<ident_t> blockIdents;
+
+		pool iPool(parentInode->idents.size());
+
+//		if directory is empty add one block
+		if (parentInode->inode.dataBlocks.size() == 0) {
+			if (0 !=
+				(ret = this->dirBlocks->addDirBlock(getRuleInfo(parentInode->inode), blockIdents, this->redundancy))) {
+				return ret;
+			}
+
+			dirBlock.entries.clear();
+
+			parentInode->inode.atime = this->now();
+			parentInode->inode.dataBlocks.push_back(blockIdents);
+			for (auto &&ident: parentInode->idents) {
+				iPool.schedule(bind(&InodeAcces::putInode, this->inodes, ident, parentInode->inode));
+			}
+			if (parentInode == this->rootIn)
+				this->writeRootInode();
+
+		} else {
+//			else get the first block.
+			blockIdents = parentInode->inode.dataBlocks.back();
+
+			for (int i = 0; i < blockIdents.size(); ++i) {
+				if (0 == (ret = this->dirBlocks->getDirBlock(blockIdents[i], dirBlock)))
+					break;
+			}
+
+			if (ret != SUCCESS)
+				return ret;
+		}
+
+
+//		if block is full, allocate new block.
+		if (this->maxEntryPerBlock == dirBlock.entries.size()) {
+			ruleInfo_t info = getRuleInfo(parentInode->inode);
+			info.lastAccess = this->now();
+			if (0 != (ret = this->dirBlocks->addDirBlock(info, blockIdents, this->redundancy))) {
+				return ret;
+			}
+
+			dirBlock.entries.clear();
+
+			parentInode->inode.atime = this->now();
+			parentInode->inode.dataBlocks.push_back(blockIdents);
+			for (auto &&ident: parentInode->idents) {
+				iPool.schedule(bind(&InodeAcces::putInode, this->inodes, ident, parentInode->inode));
+			}
+			if (parentInode == this->rootIn)
+				this->writeRootInode();
+		}
+
+
+//		write block
+		dirBlock.entries.insert(make_pair(name, inodeIds));
+		pool wpool(blockIdents.size());
+		for (auto &&ident: blockIdents) {
+//			TODO try again if block not write.
+			wpool.schedule(bind(&DirectoryBlockAccess::putDirBlock, this->dirBlocks, ident, dirBlock));
+		}
+
+		return 0;
+	}
+
+	/**
+	 * @brief Insert inode in system.
+	 *
+	 * This function get free inode Id and put inode in volumes
+	 *
+	 * @param[in] inode Inode to put
+	 * @param[out] idents Ids to new inode
+	 *
+	 * @return 0 if SUCCESS else @see satic const vars.
+	 */
+	int Mtfs::insertInode(const inode_t &inode, vector<ident_t> &idents) {
+		int ret;
+
+//		get new inode idents
+		if (0 != (ret = this->inodes->addInode(this->getRuleInfo(inode), idents, this->redundancy))) {
+			return ret;
+		}
+
+#ifdef DEBUG
+		cerr << "end addInode" << endl;
+#endif
+
+//		write inode in volumes
+		{
+			pool thPool(idents.size());
+			for (auto &&ident: idents) {
+				thPool.schedule(bind(&InodeAcces::putInode, this->inodes, ident, inode));
+//				this->inodes->putInode(ident, inode);
+			}
+		}
+
+		return ret;
+	}
+
+	int Mtfs::insertDirBlock() {
+		return 0;
+	}
+
+	int Mtfs::insertBlock() {
+		return 0;
+	}
+
+	ruleInfo_t Mtfs::getRuleInfo(const inode_t &inode) {
+		return mtfs::ruleInfo_t(inode.uid, inode.gid, inode.atime);
+	}
+
+//
+
+	inode_t *Mtfs::newInode(const mode_t &mode, const fuse_ctx *ctx) {
+		inode_t *inode = new inode_t();
+
+		inode->accesRight = mode;
+		inode->uid = ctx->uid;
+		inode->gid = ctx->gid;
+		if ((mode & S_IFDIR) != 0)
+			inode->linkCount = 2;
+
+		return inode;
+	}
+
+	uint64_t Mtfs::now() {
+		return (uint64_t) time(NULL);
+	}
 }  // namespace mtfs

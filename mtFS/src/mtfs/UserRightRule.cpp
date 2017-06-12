@@ -46,7 +46,7 @@ namespace mtfs {
 	}
 
 	bool UserRightRule::satisfyRules(ruleInfo_st info) {
-		return false;
+		return true;
 	}
 
 	bool UserRightRule::toJson(rapidjson::Value &json, rapidjson::Document::AllocatorType &allocator) {

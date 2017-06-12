@@ -24,12 +24,15 @@
 namespace mtfs {
 
 	typedef struct ruleInfo_st {
-		uint16_t uid;
+		uid_t uid;
+		gid_t gid;
+		uint64_t lastAccess;
 
-		uint16_t gid;
+		ruleInfo_st() {
+			ruleInfo_st(0, 0, 0);
+		}
 
-		uint64_t previousAccess;
-
+		ruleInfo_st(uid_t uid, gid_t gid, uint64_t atime) : uid(uid), gid(gid), lastAccess(atime) {}
 	} ruleInfo_t;
 
 	/**

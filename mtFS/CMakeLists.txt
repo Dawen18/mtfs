@@ -3,7 +3,7 @@ set(FS_HEAD
 		include/mtfs/BlockAccess.h
 		include/mtfs/BlockCache.h
 		include/mtfs/Cache.h
-		include/mtfs/DirectoryEntryAccess.h
+		include/mtfs/DirectoryBlockAccess.h
 		include/mtfs/DirectoryEntryCache.h
 		include/mtfs/InodeAcces.h
 		include/mtfs/InodeCache.h
@@ -41,7 +41,7 @@ set(MTFUSE_SRC
 
 set(CONF_HEAD
 		include/pluginSystem/PluginManager.h
-		)
+		src/utils/Semaphore.cpp include/utils/Semaphore.h)
 
 set(CONF_SRC
 		src/pluginSystem/PluginManager.cpp
@@ -49,7 +49,7 @@ set(CONF_SRC
 
 set(UTILS
 		include/utils/ThreadQueue.h
-		include/utils/Fs.h src/utils/Fs.cpp)
+		include/utils/Fs.h src/utils/Fs.cpp src/utils/Semaphore.cpp include/utils/Semaphore.h)
 
 add_executable(mtfsCreate src/mtfsCreate.cpp
 		${FS_SRC} ${CONF_SRC} ${UTILS}

@@ -303,11 +303,13 @@ int main(int argc, char **argv) {
 			cout << "new volume:" << newVolumeId << endl;
 	}
 
-	writeConfig(superblock, confName);
 
 	if (options[INSTALL] != NULL) {
 		installConfig(superblock, confName);
+		return EXIT_SUCCESS;
 	}
+
+	writeConfig(superblock, confName);
 
 	return 0;
 }
@@ -438,6 +440,22 @@ uint32_t findMissing(std::vector<uint32_t> &x, uint32_t number) {
 }
 
 void installConfig(superblock_t &superblock, string name) {
+//	create ident for rootInode.
+	superblock.rootInodes.clear();
+	const int rootRedundancy = max(3, superblock.redundancy);
+	int i = 0;
+	for (auto &&pool: superblock.pools) {
+		for (auto &&volume: pool.second.volumes) {
+			if (rootRedundancy > i)
+				superblock.rootInodes.push_back(ident_t(0, volume.first, pool.first));
+			else
+				break;
+			i++;
+		}
+	}
+
+	writeConfig(superblock, name);
+
 	string filename = "superblock.json";
 	boost::filesystem::create_directory(INSTALL_DIR + name);
 	string src = string(CONF_DIR) + name + ".json";
@@ -454,7 +472,7 @@ void installConfig(superblock_t &superblock, string name) {
 //	Attach all plugins for write superblock and rootInode
 //	Only 3 firsts for rootInode
 	pluginSystem::PluginManager *manager = pluginSystem::PluginManager::getInstance();
-	int i = 0;
+	i = 0;
 	for (auto &&pool: superblock.pools) {
 		for (auto &&volume: pool.second.volumes) {
 			volume.second.params["home"] = PLUGIN_HOME;
@@ -465,9 +483,9 @@ void installConfig(superblock_t &superblock, string name) {
 			plugin = manager->getPlugin(volume.second.pluginName);
 			plugin->attach(volume.second.params);
 
-			if (i < 3)
-				plugin->writeInode(0, rootInode);
-			plugin->writeSuperblock(superblock);
+			if (rootRedundancy > i)
+				plugin->putInode(0, rootInode);
+			plugin->putSuperblock(superblock);
 
 			i++;
 		}

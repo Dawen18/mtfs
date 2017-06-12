@@ -12,10 +12,20 @@ namespace mtfs {
 	class Pool {
 	public:
 		static constexpr const char *POOLS = "pools";
-		static const int VOLUME_ID_EXIST = -1;
+
+//		STATUS CODE
+		static const int SUCCESS = 0;
+		static const int VOLUME_ID_EXIST = 1;
+		static const int NO_VALID_VOLUME = 2;
 
 
 	private:
+		enum queryType {
+			INODE,
+			DIR_BLOCK,
+			BLOCK,
+		};
+
 		std::map<uint32_t, Volume *> volumes;
 
 		std::map<uint32_t, Rule *> rules;
@@ -24,6 +34,8 @@ namespace mtfs {
 
 
 	public:
+		virtual ~Pool();
+
 		static bool validate(const rapidjson::Value &pool);
 
 		static void
@@ -33,21 +45,30 @@ namespace mtfs {
 
 		int addVolume(uint32_t volumeId, Volume *volume, Rule *rule);
 
-		bool addBlock(ruleInfo_t &info, uint16_t &volumeId, uint64_t &blockId);
-
-		bool delBlock(uint16_t volumeId, uint64_t blockId);
-
-		bool readBlock(uint16_t volumeId, uint64_t blockId, uint8_t *block);
-
-		bool writeBlock(uint16_t volumeId, uint64_t blockId, uint8_t *block);
-
-		bool addInode(ruleInfo_t &info, uint16_t &volumeId, uint64_t &inodeId);
+		int addInode(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb = 1);
 
 		bool delInode(uint16_t volumeId, uint64_t inodeId);
 
 		bool readInode(uint16_t volumeId, uint64_t inodeId);
 
-		bool writeInode(uint16_t volumeId, uint64_t inodeId);
+		int putInode(const uint32_t &volumeId, const uint64_t &inodeId, const inode_t &inode);
+
+		int addDirBlock(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb = 1);
+
+		int delDirBlock(const uint32_t &volumeId, const uint64_t &id);
+
+		int getDirBlock(const uint32_t &volumeId, const uint64_t &id, dirBlock_t &block);
+
+		int putDirBlock(const uint32_t &volumeId, const uint64_t &id, const dirBlock_t &block);
+
+		int addBlock(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb = 1);
+
+		bool delBlock(uint16_t volumeId, uint64_t blockId);
+
+		bool readBlock(uint16_t volumeId, uint64_t blockId, uint8_t *block);
+
+		int putBlock(const uint32_t &volumeId, const uint64_t &blockId, const uint8_t *block);
+
 
 		std::vector<superblock_t> readSuperblocks();
 
@@ -61,7 +82,9 @@ namespace mtfs {
 
 
 	private:
-		bool chooseVolume(ruleInfo_t &info, pluginSystem::Plugin *volume);
+		int add(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb, const queryType &type);
+
+		int getValidVolumes(const ruleInfo_t &info, std::vector<uint32_t> &volumeIds);
 	};
 
 }  // namespace mtfs

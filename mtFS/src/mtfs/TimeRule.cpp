@@ -2,10 +2,19 @@
 #include "mtfs/TimeRule.h"
 
 namespace mtfs {
-	TimeRule::TimeRule(uint64_t lowerLimit, uint64_t higerLimit) : lowerLimit(lowerLimit), higerLimit(higerLimit) {}
+	TimeRule::TimeRule(uint64_t lowerLimit, uint64_t higerLimit) : lowerLimit(lowerLimit * 60),
+																   higerLimit(higerLimit * 60) {}
 
 	bool TimeRule::satisfyRules(ruleInfo_st info) {
-		return false;
+		uint64_t now = this->now();
+		uint64_t delay = now - info.lastAccess;
+
+		if (0 == this->lowerLimit)
+			return delay <= this->higerLimit;
+		else if (0 == this->higerLimit)
+			return delay >= this->lowerLimit;
+		else
+			return this->lowerLimit <= delay <= this->higerLimit;
 	}
 
 	int TimeRule::copyConfig(rapidjson::Document &source, rapidjson::Value &destination,
@@ -43,5 +52,9 @@ namespace mtfs {
 		}
 
 		return true;
+	}
+
+	uint64_t TimeRule::now() {
+		return (uint64_t) time(NULL);
 	}
 }  // namespace mtfs

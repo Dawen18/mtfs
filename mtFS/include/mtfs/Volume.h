@@ -9,17 +9,25 @@
 #include <rapidjson/document.h>
 
 namespace mtfs {
-	class Volume : public pluginSystem::Plugin {
+	class Volume {
 	public:
 		static constexpr const char *VOLUMES = "volumes";
 
 	private:
+		enum queryType {
+			INODE,
+			DIR_BLOCK,
+			BLOCK,
+		};
+
 		pluginSystem::Plugin *plugin;
 		std::map<uint64_t, uint64_t> blocksAccess;
 		std::map<uint64_t, uint64_t> inodesAccess;
 
 
 	public:
+		virtual ~Volume();
+
 		static bool validate(const rapidjson::Value &volume);
 
 		static void
@@ -43,33 +51,43 @@ namespace mtfs {
 
 		std::vector<ident_st> getInodesAboveLimit();
 
-		std::vector<std::string> getInfos() override;
+		int addInode(uint64_t &inodeId);
 
-		bool attach(std::map<std::string, std::string> params) override;
+		int addInode(std::vector<uint64_t> &ids, const int nb);
 
-		bool detach() override;
+		int delInode(const uint64_t &inodeId);
 
-		bool addInode(std::uint64_t &inodeId) override;
+		int getInode(const uint64_t &inodeId, mtfs::inode_st &inode);
 
-		bool delInode(std::uint64_t inodeId) override;
+		int putInode(const uint64_t &inodeId, const inode_t &inode);
 
-		bool readInode(std::uint64_t inodeId, mtfs::inode_st &inode) override;
+		int addDirBlock(uint64_t &blockId);
 
-		bool writeInode(std::uint64_t inodeId, mtfs::inode_st &inode) override;
+		int addDirBlock(std::vector<uint64_t> &ids, const int nb);
 
-		bool addBlock(std::uint64_t &blockId) override;
+		int delDirBlock(const std::uint64_t &blockId);
 
-		bool delBlock(std::uint64_t blockId) override;
+		int getDirBlock(const std::uint64_t &blockId, dirBlock_t &block);
 
-		bool readBlock(std::uint64_t blockId, std::uint8_t *buffer) override;
+		int putDirBlock(const std::uint64_t &blockId, const dirBlock_t &block);
 
-		bool writeBlock(std::uint64_t blockId, std::uint8_t *buffer) override;
+		int addBlock(std::uint64_t &blockId);
 
-		bool readSuperblock(mtfs::superblock_t &superblock) override;
+		int addBlock(std::vector<uint64_t> &ids, const int nb);
 
-		bool writeSuperblock(superblock_t &superblock) override;
+		bool delBlock(std::uint64_t blockId);
+
+		bool getBlock(std::uint64_t blockId, std::uint8_t *buffer);
+
+		int putBlock(const uint64_t blockId, const uint8_t *buffer);
+
+		bool getSuperblock(mtfs::superblock_t &superblock);
+
+		bool putSuperblock(superblock_t &superblock);
 
 	private:
+		int add(std::vector<uint64_t> &ids, const int nb, const queryType &type);
+
 		bool uptadeLastAcces(uint64_t id, std::map<uint64_t, std::vector<uint64_t>> map);
 	};
 

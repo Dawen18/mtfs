@@ -7,7 +7,7 @@
 #include <iostream>
 #include <assert.h>
 
-#include "mtfs/DirectoryEntryAccess.h"
+#include "mtfs/DirectoryBlockAccess.h"
 #include "mtfs/DirectoryEntryCache.h"
 #include "mtfs/InodeAcces.h"
 #include "mtfs/InodeCache.h"
@@ -17,7 +17,7 @@
 
 namespace mtfs {
 	class Cache
-			: public DirectoryEntryAccess,
+			: public DirectoryBlockAccess,
 			  public InodeCache,
 			  public InodeAcces,
 			  public BlockAccess,

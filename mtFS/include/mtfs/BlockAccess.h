@@ -12,13 +12,16 @@
 namespace mtfs {
 	class BlockAccess {
 	public:
-		virtual bool addBlock(inode_st &inode)=0;
+
+		virtual ~BlockAccess(){};
+
+		virtual int addBlock(const ruleInfo_t &infos, std::vector<ident_t> &ident, const int nb = 1)=0;
 
 		virtual bool delBlock(inode_st &inode)=0;
 
-		virtual bool getBlock(inode_st &inode, int blockNumber, uint8_t *buffer)=0;
+		virtual bool getBlock(inode_st &inode, ident_t &blockId, uint8_t *buffer)=0;
 
-		virtual bool setBlock(inode_st &inode, int blockNb, uint8_t *buffer)=0;
+		virtual int putBlock(const ident_t &blockId, uint8_t *buffer)=0;
 
 	};
 

@@ -22,7 +22,17 @@ namespace mtfsFuse {
 
 		void getAttr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) override;
 
+		void lookup(fuse_req_t req, fuse_ino_t parent, const char *name) override;
 
+		void init(void *userdata, fuse_conn_info *conn) override;
+
+		void access(fuse_req_t req, fuse_ino_t ino, int mask) override;
+
+		void opendir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) override;
+
+		void mknod(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode, dev_t rdev) override;
+
+		void destroy(void *userdata) override;
 	};
 
 }  // namespace mtfsFuse

@@ -12,13 +12,15 @@
 namespace mtfs {
 	class InodeAcces {
 	public:
-		virtual bool addInode(inode_t &inode)=0;
+		virtual ~InodeAcces(){};
 
-		virtual bool delInode(ident_t inodeId)=0;
+		virtual int addInode(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb = 1)=0;
 
-		virtual bool getInode(ident_t inodeId, inode_t &inode)=0;
+		virtual int delInode(const ident_t &inodeId)=0;
 
-		virtual bool setInode(ident_t inodeId, inode_t &inode)=0;
+		virtual int getInode(const ident_t &inodeId, inode_t &inode)=0;
+
+		virtual int putInode(const ident_t &inodeId, const inode_t &inode)=0;
 
 	};
 

@@ -4,6 +4,15 @@ using namespace std;
 
 namespace mtfs {
 
+	Pool::~Pool() {
+		for (auto &&vol: this->volumes) {
+			delete vol.second;
+		}
+		for (auto &&rule: this->rules) {
+			delete rule.second;
+		}
+	}
+
 	bool Pool::validate(const rapidjson::Value &pool) {
 		if (!pool.HasMember(mtfs::Volume::VOLUMES))
 			throw invalid_argument("Volumes missing!");
@@ -80,24 +89,8 @@ namespace mtfs {
 		return 0;
 	}
 
-	bool Pool::addBlock(ruleInfo_t &info, uint16_t &volumeId, uint64_t &blockId) {
-		return false;
-	}
-
-	bool Pool::delBlock(uint16_t volumeId, uint64_t blockId) {
-		return false;
-	}
-
-	bool Pool::readBlock(uint16_t volumeId, uint64_t blockId, uint8_t *block) {
-		return false;
-	}
-
-	bool Pool::writeBlock(uint16_t volumeId, uint64_t blockId, uint8_t *block) {
-		return false;
-	}
-
-	bool Pool::addInode(ruleInfo_t &info, uint16_t &volumeId, uint64_t &inodeId) {
-		return false;
+	int Pool::addInode(const ruleInfo_t &info, vector<ident_t> &idents, const int nb) {
+		return this->add(info, idents, nb, this->INODE);
 	}
 
 	bool Pool::delInode(uint16_t volumeId, uint64_t inodeId) {
@@ -108,8 +101,40 @@ namespace mtfs {
 		return false;
 	}
 
-	bool Pool::writeInode(uint16_t volumeId, uint64_t inodeId) {
+	int Pool::putInode(const uint32_t &volumeId, const uint64_t &inodeId, const inode_t &inode) {
+		return this->volumes[volumeId]->putInode(inodeId, inode);
+	}
+
+	int Pool::addDirBlock(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb) {
+		return this->add(info, idents, nb, this->DIR_BLOCK);
+	}
+
+	int Pool::delDirBlock(const uint32_t &volumeId, const uint64_t &id) {
+		return 0;
+	}
+
+	int Pool::getDirBlock(const uint32_t &volumeId, const uint64_t &id, dirBlock_t &block) {
+		return this->volumes[volumeId]->getDirBlock(id, block);
+	}
+
+	int Pool::putDirBlock(const uint32_t &volumeId, const uint64_t &id, const dirBlock_t &block) {
+		return this->volumes[volumeId]->putDirBlock(id, block);
+	}
+
+	int Pool::addBlock(const ruleInfo_t &info, vector<ident_t> &idents, const int nb) {
+		return this->add(info, idents, nb, this->BLOCK);
+	}
+
+	bool Pool::delBlock(uint16_t volumeId, uint64_t blockId) {
 		return false;
+	}
+
+	bool Pool::readBlock(uint16_t volumeId, uint64_t blockId, uint8_t *block) {
+		return false;
+	}
+
+	int Pool::putBlock(const uint32_t &volumeId, const uint64_t &blockId, const uint8_t *block) {
+		return this->volumes[volumeId]->putBlock(blockId, block);
 	}
 
 	vector<superblock_t> Pool::readSuperblocks() {
@@ -131,7 +156,76 @@ namespace mtfs {
 	void Pool::moveBlocks(vector<move_t> &asMoved, vector<ident_t> &needOtherPool) {
 	}
 
-	bool Pool::chooseVolume(ruleInfo_t &info, pluginSystem::Plugin *volume) {
-		return false;
+
+	int Pool::add(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb, const Pool::queryType &type) {
+		int ret;
+		vector<uint32_t> volumeIds;
+		if (0 != (ret = this->getValidVolumes(info, volumeIds))) {
+			return ret;
+		}
+
+		if (0 == volumeIds.size())
+			return NO_VALID_VOLUME;
+
+		if (nb <= volumeIds.size()) {
+			for (int i = 0; i < nb; i++) {
+				uint64_t id = 0;
+				const uint32_t vid = volumeIds[i];
+
+				switch (type) {
+					case INODE:
+						this->volumes[vid]->addInode(id);
+						break;
+					case DIR_BLOCK:
+						this->volumes[vid]->addDirBlock(id);
+						break;
+					case BLOCK:
+						this->volumes[vid]->addBlock(id);
+						break;
+				}
+
+				idents.push_back(ident_t(id, vid));
+			}
+		} else {
+			int blkPerPool = (int) (nb / volumeIds.size());
+			int remainder = (int) (nb % volumeIds.size());
+			for (auto &&vid: volumeIds) {
+				vector<uint64_t> tmpIds;
+				int nbToAllocate = blkPerPool;
+
+				if (0 < remainder) {
+					nbToAllocate++;
+					remainder--;
+				}
+
+				switch (type) {
+					case INODE:
+						this->volumes[vid]->addInode(tmpIds, nbToAllocate);
+						break;
+					case DIR_BLOCK:
+						this->volumes[vid]->addDirBlock(tmpIds, nbToAllocate);
+						break;
+					case BLOCK:
+						this->volumes[vid]->addBlock(tmpIds, nbToAllocate);
+						break;
+				}
+
+				for (auto &&tmpId: tmpIds) {
+					idents.push_back(ident_t(tmpId, vid));
+				}
+			}
+		}
+
+		return ret;
 	}
+
+	int Pool::getValidVolumes(const ruleInfo_t &info, vector<uint32_t> &volumeIds) {
+		for (auto &&item: this->rules) {
+			if (item.second->satisfyRules(info))
+				volumeIds.push_back(item.first);
+		}
+		return 0;
+	}
+
+
 }  // namespace mtfs

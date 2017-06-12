@@ -58,6 +58,8 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
+	cout << boost::filesystem::current_path() << endl;
+
 //	build mtfs
 	mtfs::Mtfs::start(d, HOME_DIR, sysName);
 
