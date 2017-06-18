@@ -288,7 +288,6 @@ namespace mtfs {
 		ident_t newId;
 	} move_t;
 
-	typedef struct mtfs_req_st mtfs_req_t;
 
 }  // namespace mtFS
 

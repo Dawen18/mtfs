@@ -19,7 +19,7 @@ namespace mtfs {
 
 		virtual bool delBlock(inode_st &inode)=0;
 
-		virtual bool getBlock(inode_st &inode, ident_t &blockId, uint8_t *buffer)=0;
+		virtual int getBlock(const ident_t &blockId, uint8_t *buffer)=0;
 
 		virtual int putBlock(const ident_t &blockId, uint8_t *buffer)=0;
 

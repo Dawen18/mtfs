@@ -59,7 +59,7 @@ namespace mtfs {
 
 		bool delBlock(inode_st &inode) override;
 
-		bool getBlock(inode_st &inode, ident_t &blockId, uint8_t *buffer) override;
+		int getBlock(const ident_t &blockId, uint8_t *buffer) override;
 
 		int putBlock(const ident_t &blockId, uint8_t *buffer) override;
 

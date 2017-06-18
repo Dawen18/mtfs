@@ -92,7 +92,7 @@ namespace mtfs {
 		return false;
 	}
 
-	bool PoolManager::getBlock(inode_st &inode, ident_t &blockId, uint8_t *buffer) {
+	int PoolManager::getBlock(const ident_t &blockId, uint8_t *buffer) {
 		return false;
 	}
 
@@ -130,6 +130,9 @@ namespace mtfs {
 						break;
 					case BLOCK:
 						this->pools[id]->addBlock(info, tmpIdent);
+						break;
+					default:
+//						TODO LOG error
 						break;
 				}
 

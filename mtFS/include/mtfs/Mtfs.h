@@ -34,12 +34,18 @@ namespace mtfs {
 
 	private:
 //		CONFIG
-		static const int SIMULT_DL = 2;
+		static const size_t SIMULT_DL = 2;
+		static const int INIT_DL = 2;
+		static constexpr const double ATTR_TIMEOUT = 1.0;
 
 //		REQUEST STATUS CODES
 		static const int SUCCESS = 0;
 		static const int PENDING = 9999;
 
+		enum blockType {
+			DIR,
+			DATA,
+		};
 
 		static Mtfs *instance;
 		static boost::threadpool::pool *threadPool;
@@ -86,7 +92,15 @@ namespace mtfs {
 
 		void access(fuse_req_t req, fuse_ino_t ino, int mask);
 
+		void open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
+
+		void release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
+
 		void opendir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
+
+		void readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
+
+		void releasedir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
 
 	private:
 
@@ -102,28 +116,40 @@ namespace mtfs {
 
 		void stat(fuse_req_t req, fuse_ino_t ino);
 
-		int rootStat(struct stat &st);
-
 		int addEntry(internalInode_st *parentInode, std::string name, std::vector<ident_t> &inodeIds);
 
 		int insertInode(const inode_t &inode, std::vector<ident_t> &idents);
 
-		void dlDirBlocks(std::vector<ident_t> &ids, std::queue<dirBlock_t> *q, std::mutex *queueMutex,
-						 Semaphore *sem);
+		void dlBlocks(const inode_t &inode, dl_st *dlSt, const blockType type, const int firstBlockIdx);
+
+		void dlDirBlocks(std::vector<ident_t> &ids, std::queue<dirBlock_t> *q, std::mutex *queueMutex, Semaphore *sem);
+
+		void dlInodes(dl_st *src, dl_st *dst);
+
+//
+		void
+		dlInode(std::vector<ident_t> &ids, std::queue<std::pair<std::string, inode_t>> *queue, std::mutex *queueMutex,
+				Semaphore *sem,
+				std::string &key);
 
 		////							UTILS							////
 
 		internalInode_st *getIntInode(fuse_ino_t ino);
 
+		void doReaddir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi, const bool &plus);
+
+		size_t dirBufAdd(fuse_req_t &req, char *buf, size_t &currentSize, std::string name, internalInode_st &inode,
+						 const bool &plus);
+
 		void getInode(std::vector<ident_t> &ids, inode_t &inode);
 
-		void buildParam(const inode_t &inode, fuse_entry_param &param);
+		void buildParam(const internalInode_st &inode, fuse_entry_param &param);
 
 		void buildStat(const internalInode_st &inode, struct stat &st);
 
 		ruleInfo_t getRuleInfo(const inode_t &inode);
 
-		static inode_t *newInode(const mode_t &mode, const fuse_ctx *ctx);
+		static internalInode_st *newInode(const mode_t &mode, const fuse_ctx *ctx);
 
 		static uint64_t now();
 	};
