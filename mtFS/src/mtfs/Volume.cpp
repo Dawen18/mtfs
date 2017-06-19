@@ -111,67 +111,6 @@ namespace mtfs {
 		return blocks;
 	}
 
-
-	int Volume::addInode(uint64_t &inodeId) {
-		return this->plugin->addInode(&inodeId);
-	}
-
-	int Volume::addInode(std::vector<uint64_t> &ids, const int nb) {
-		return this->add(ids, nb, this->INODE);
-	}
-
-	int Volume::delInode(const uint64_t &inodeId) {
-		return plugin->delInode(inodeId);
-	}
-
-	int Volume::getInode(const uint64_t &inodeId, mtfs::inode_st &inode) {
-		return plugin->getInode(inodeId, inode);
-	}
-
-	int Volume::putInode(const uint64_t &inodeId, const inode_t &inode) {
-		return plugin->putInode(inodeId, inode);
-	}
-
-	int Volume::addDirBlock(uint64_t &blockId) {
-		return this->plugin->addDirBlock(&blockId);
-	}
-
-	int Volume::addDirBlock(std::vector<uint64_t> &ids, const int nb) {
-		return this->add(ids, nb, this->DIR_BLOCK);
-	}
-
-	int Volume::delDirBlock(const std::uint64_t &blockId) {
-		return 0;
-	}
-
-	int Volume::getDirBlock(const std::uint64_t &blockId, dirBlock_t &block) {
-		return this->plugin->getDirBlock(blockId, block);
-	}
-
-	int Volume::putDirBlock(const std::uint64_t &blockId, const dirBlock_t &block) {
-		return this->plugin->putDirBlock(blockId, block);
-	}
-
-	int Volume::addBlock(std::uint64_t &blockId) {
-		return plugin->addBlock(&blockId);
-	}
-
-	int Volume::addBlock(std::vector<uint64_t> &ids, const int nb) {
-		return this->add(ids, nb, this->BLOCK);
-	}
-
-	bool Volume::delBlock(std::uint64_t blockId) {
-		return plugin->delBlock(blockId);
-	}
-
-	bool Volume::getBlock(std::uint64_t blockId, std::uint8_t *buffer) {
-		return plugin->getBlock(blockId, buffer);
-	}
-
-	int Volume::putBlock(const uint64_t blockId, const uint8_t *buffer) {
-		return plugin->putBlock(blockId, buffer);
-	}
-
 	bool Volume::getSuperblock(mtfs::superblock_t &superblock) {
 		return plugin->getSuperblock(superblock);
 	}
@@ -180,8 +119,27 @@ namespace mtfs {
 		return plugin->putSuperblock(superblock);
 	}
 
+	int Volume::add(uint64_t &id, const Acces::queryType type) {
+		int ret;
+		switch (type) {
+			case Acces::INODE:
+				ret = this->plugin->addInode(&id);
+				break;
+			case Acces::DIR_BLOCK:
+				ret = this->plugin->addDirBlock(&id);
+				break;
+			case Acces::DATA_BLOCK:
+				ret = this->plugin->addBlock(&id);
+				break;
+			default:
+				ret = ENOSYS;
+//				TODO log noimplemented
+				break;
+		}
+		return ret;
+	}
 
-	int Volume::add(std::vector<uint64_t> &ids, const int nb, const Volume::queryType &type) {
+	int Volume::add(std::vector<uint64_t> &ids, const int nb, const Acces::queryType type) {
 		boost::threadpool::pool thPool((size_t) nb);
 
 		vector<uint64_t *> tmp;
@@ -189,14 +147,17 @@ namespace mtfs {
 			uint64_t *id = new uint64_t();
 			tmp.push_back(id);
 			switch (type) {
-				case INODE:
+				case Acces::INODE:
 					thPool.schedule(bind(&pluginSystem::Plugin::addInode, this->plugin, id));
 					break;
-				case DIR_BLOCK:
+				case Acces::DIR_BLOCK:
 					thPool.schedule(bind(&pluginSystem::Plugin::addDirBlock, this->plugin, id));
 					break;
-				case BLOCK:
+				case Acces::DATA_BLOCK:
 					thPool.schedule(bind(&pluginSystem::Plugin::addBlock, this->plugin, id));
+					break;
+				default:
+//					TODO log
 					break;
 			}
 		}
@@ -209,6 +170,72 @@ namespace mtfs {
 		}
 
 		return 0;
+	}
+
+	int Volume::del(const uint64_t &id, const Acces::queryType type) {
+		int ret;
+
+		switch (type) {
+			case Acces::INODE:
+				ret = this->plugin->delInode(id);
+				break;
+			case Acces::DIR_BLOCK:
+				ret = this->plugin->delDirBlock(id);
+				break;
+			case Acces::DATA_BLOCK:
+				ret = this->plugin->delBlock(id);
+				break;
+			default:
+				ret = ENOSYS;
+//				TODO log noimplemented
+				break;
+		}
+
+		return ret;
+	}
+
+	int Volume::get(const uint64_t &id, void *data, Acces::queryType type) {
+		int ret;
+
+		switch (type) {
+			case Acces::INODE:
+				ret = this->plugin->getInode(id, *(inode_t *) data);
+				break;
+			case Acces::DIR_BLOCK:
+				ret = this->plugin->getDirBlock(id, *(dirBlock_t *) data);
+				break;
+			case Acces::DATA_BLOCK:
+				ret = this->plugin->getBlock(id, (uint8_t *) data);
+				break;
+			default:
+				ret = ENOSYS;
+//				TODO log noimplemented
+				break;
+		}
+
+		return ret;
+	}
+
+	int Volume::put(const uint64_t &id, const void *data, Acces::queryType type) {
+		int ret;
+
+		switch (type) {
+			case Acces::INODE:
+				ret = this->plugin->putInode(id, *(inode_t *) data);
+				break;
+			case Acces::DIR_BLOCK:
+				ret = this->plugin->putDirBlock(id, *(dirBlock_t *) data);
+				break;
+			case Acces::DATA_BLOCK:
+				ret = this->plugin->putBlock(id, (uint8_t *) data);
+				break;
+			default:
+				ret = ENOSYS;
+//				TODO log noimplemented
+				break;
+		}
+
+		return ret;
 	}
 
 	bool Volume::uptadeLastAcces(uint64_t id, std::map<uint64_t, std::vector<uint64_t>> map) {

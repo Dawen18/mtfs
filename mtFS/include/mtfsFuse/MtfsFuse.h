@@ -44,6 +44,8 @@ namespace mtfsFuse {
 		void readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) override;
 
 		void releasedir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) override;
+
+		void readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) override;
 	};
 
 }  // namespace mtfsFuse

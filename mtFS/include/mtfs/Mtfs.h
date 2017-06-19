@@ -4,9 +4,7 @@
 #include <thread>
 
 #include <mtfs/Rule.h>
-#include <mtfs/InodeAcces.h>
-#include <mtfs/BlockAccess.h>
-#include <mtfs/DirectoryBlockAccess.h>
+#include <mtfs/Acces.h>
 #include <rapidjson/document.h>
 #include <boost/threadpool.hpp>
 #include <fuse3/fuse_lowlevel.h>
@@ -35,6 +33,7 @@ namespace mtfs {
 	private:
 //		CONFIG
 		static const size_t SIMULT_DL = 2;
+		static const size_t SIMULT_UP = 2;
 		static const int INIT_DL = 2;
 		static constexpr const double ATTR_TIMEOUT = 1.0;
 
@@ -56,9 +55,9 @@ namespace mtfs {
 		int maxEntryPerBlock;
 		internalInode_st *rootIn;
 
-		InodeAcces *inodes;
-		DirectoryBlockAccess *dirBlocks;
-		BlockAccess *blocks;
+		Acces *inodes;
+		Acces *dirBlocks;
+		Acces *blocks;
 
 
 	public:
@@ -98,6 +97,8 @@ namespace mtfs {
 
 		void opendir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
 
+		void readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
+
 		void readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
 
 		void releasedir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
@@ -136,7 +137,8 @@ namespace mtfs {
 
 		internalInode_st *getIntInode(fuse_ino_t ino);
 
-		void doReaddir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi, const bool &plus);
+		void
+		doReaddir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi, const bool &plus = false);
 
 		size_t dirBufAdd(fuse_req_t &req, char *buf, size_t &currentSize, std::string name, internalInode_st &inode,
 						 const bool &plus);

@@ -332,6 +332,11 @@ namespace mtfs {
 
 		buildStat(*inInode, *attr);
 		fuse_reply_attr(req, attr, 1.0);
+
+		pool upThPool(this->SIMULT_UP);
+		for (auto &&id: inInode->idents) {
+			upThPool.schedule(bind(&Acces::put, this->inodes, id, &inInode->inode, Acces::INODE));
+		}
 	}
 
 	void Mtfs::lookup(fuse_req_t req, fuse_ino_t parent, const string name) {
@@ -385,7 +390,8 @@ namespace mtfs {
 
 
 //		TODO Doit être un pointeur car lookup avant open donc inode doit être en mémoire.
-		internalInode_st inode = internalInode_st();
+		internalInode_st *inode = new internalInode_st();
+		inode->idents = inodeIds;
 		int ret;
 
 		if (0 == inodeIds.size()) {
@@ -394,7 +400,7 @@ namespace mtfs {
 		}
 
 		do {
-			ret = this->inodes->getInode(inodeIds.back(), inode.inode);
+			ret = this->inodes->get(inodeIds.back(), &inode->inode, Acces::DATA_BLOCK);
 			inodeIds.pop_back();
 			if (inodeIds.empty())
 				break;
@@ -405,7 +411,7 @@ namespace mtfs {
 			fuse_reply_err(req, ret);
 		else {
 			fuse_entry_param param = fuse_entry_param();
-			this->buildParam(inode, param);
+			this->buildParam(*inode, param);
 			fuse_reply_entry(req, &param);
 		}
 
@@ -529,7 +535,7 @@ namespace mtfs {
 		if (!inode->inode.dataBlocks.empty()) {
 			uint8_t *firstBlock = (uint8_t *) malloc(this->blockSize * sizeof(uint8_t));
 
-			this->blocks->getBlock(inode->inode.dataBlocks.front().front(), firstBlock);
+			this->blocks->get(inode->inode.dataBlocks.front().front(), &firstBlock, Acces::DATA_BLOCK);
 			fi->fh = (uint64_t) firstBlock;
 		} else
 			fi->fh = 0;
@@ -538,7 +544,7 @@ namespace mtfs {
 	}
 
 	void Mtfs::release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-		(void) ino;
+		internalInode_st *intIno = this->getIntInode(ino);
 
 		delete (uint8_t *) fi->fh;
 		fi->fh = 0;
@@ -573,6 +579,10 @@ namespace mtfs {
 
 		fuse_reply_open(req, fi);
 //		fuse_reply_err(req, ENOSYS);
+	}
+
+	void Mtfs::readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) {
+		this->doReaddir(req, ino, size, off, fi, false);
 	}
 
 	void Mtfs::readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) {
@@ -736,7 +746,8 @@ namespace mtfs {
 //		if directory is empty add one block
 		if (parentInode->inode.dataBlocks.size() == 0) {
 			if (0 !=
-				(ret = this->dirBlocks->addDirBlock(getRuleInfo(parentInode->inode), blockIdents, this->redundancy))) {
+				(ret = this->dirBlocks->add(getRuleInfo(parentInode->inode), blockIdents, Acces::DIR_BLOCK,
+											this->redundancy))) {
 				return ret;
 			}
 
@@ -745,7 +756,7 @@ namespace mtfs {
 			parentInode->inode.atime = this->now();
 			parentInode->inode.dataBlocks.push_back(blockIdents);
 			for (auto &&ident: parentInode->idents) {
-				iPool.schedule(bind(&InodeAcces::putInode, this->inodes, ident, parentInode->inode));
+				iPool.schedule(bind(&Acces::put, this->inodes, ident, &parentInode->inode, Acces::INODE));
 			}
 			if (parentInode == this->rootIn)
 				this->writeRootInode();
@@ -755,7 +766,7 @@ namespace mtfs {
 			blockIdents = parentInode->inode.dataBlocks.back();
 
 			for (int i = 0; i < blockIdents.size(); ++i) {
-				if (0 == (ret = this->dirBlocks->getDirBlock(blockIdents[i], dirBlock)))
+				if (0 == (ret = this->dirBlocks->get(blockIdents[i], &dirBlock, Acces::DIR_BLOCK)))
 					break;
 			}
 
@@ -768,7 +779,7 @@ namespace mtfs {
 		if (this->maxEntryPerBlock == dirBlock.entries.size()) {
 			ruleInfo_t info = getRuleInfo(parentInode->inode);
 			info.lastAccess = this->now();
-			if (0 != (ret = this->dirBlocks->addDirBlock(info, blockIdents, this->redundancy))) {
+			if (0 != (ret = this->dirBlocks->add(info, blockIdents, Acces::DIR_BLOCK, this->redundancy))) {
 				return ret;
 			}
 
@@ -777,7 +788,7 @@ namespace mtfs {
 			parentInode->inode.atime = this->now();
 			parentInode->inode.dataBlocks.push_back(blockIdents);
 			for (auto &&ident: parentInode->idents) {
-				iPool.schedule(bind(&InodeAcces::putInode, this->inodes, ident, parentInode->inode));
+				iPool.schedule(bind(&Acces::put, this->inodes, ident, &parentInode->inode, Acces::INODE));
 			}
 			if (parentInode == this->rootIn)
 				this->writeRootInode();
@@ -789,7 +800,7 @@ namespace mtfs {
 		pool wpool(blockIdents.size());
 		for (auto &&ident: blockIdents) {
 //			TODO try again if block not write.
-			wpool.schedule(bind(&DirectoryBlockAccess::putDirBlock, this->dirBlocks, ident, dirBlock));
+			wpool.schedule(bind(&Acces::put, this->dirBlocks, ident, &dirBlock, Acces::DIR_BLOCK));
 		}
 
 		return 0;
@@ -809,7 +820,7 @@ namespace mtfs {
 		int ret;
 
 //		get new inode idents
-		if (0 != (ret = this->inodes->addInode(this->getRuleInfo(inode), idents, this->redundancy))) {
+		if (0 != (ret = this->inodes->add(this->getRuleInfo(inode), idents, Acces::DATA_BLOCK, this->redundancy))) {
 			return ret;
 		}
 
@@ -817,8 +828,7 @@ namespace mtfs {
 		{
 			pool thPool(idents.size());
 			for (auto &&ident: idents) {
-				thPool.schedule(bind(&InodeAcces::putInode, this->inodes, ident, inode));
-//				this->inodes->putInode(ident, inode);
+				thPool.schedule(bind(&Acces::put, this->inodes, ident, &inode, Acces::INODE));
 			}
 		}
 
@@ -868,7 +878,7 @@ namespace mtfs {
 		dirBlock_t db = dirBlock_t();
 
 		for (auto &&id: ids) {
-			ret = this->dirBlocks->getDirBlock(id, db);
+			ret = this->dirBlocks->get(id, &db, Acces::DIR_BLOCK);
 			if (SUCCESS == ret)
 				break;
 		}
@@ -933,7 +943,7 @@ namespace mtfs {
 		inode_t in = inode_t();
 
 		for (auto &&id: ids) {
-			ret = this->inodes->getInode(id, in);
+			ret = this->inodes->get(id, &in, Acces::INODE);
 			if (SUCCESS == ret)
 				break;
 		}
@@ -970,7 +980,7 @@ namespace mtfs {
 
 		if (fd->firstCall) {
 			fd->firstCall = false;
-			size_t entrySize = this->dirBufAdd(req, p, currSize, ".", *inode, true);
+			size_t entrySize = this->dirBufAdd(req, p, currSize, ".", *inode, plus);
 			p += entrySize;
 			rem -= entrySize;
 			currSize += entrySize;
@@ -996,18 +1006,20 @@ namespace mtfs {
 
 			fd->inoDl.sem->wait();
 
+//			internalInode_st inInode;
+			shared_ptr<internalInode_st> intInode(new internalInode_st());
 			lock(inoEndLock, inoFifoLock);
 			if (fd->inoDl.end && 0 == fd->inoDl.fifo.inodeQueue->size())
 				break;
 			inoEndLock.unlock();
 
-			pair<string, inode_t> &entry = fd->inoDl.fifo.inodeQueue->front();
+			string entryName = fd->inoDl.fifo.inodeQueue->front().first;
+			intInode->inode = fd->inoDl.fifo.inodeQueue->front().second;
 			fd->inoDl.fifo.inodeQueue->pop();
 			inoFifoLock.unlock();
 
-			internalInode_st inInode;
-			inInode.inode = entry.second;
-			size_t entrySize = this->dirBufAdd(req, p, currSize, entry.first, inInode, true);
+
+			size_t entrySize = this->dirBufAdd(req, p, currSize, entryName, *intInode, plus);
 
 			if (entrySize > rem) {
 				lock(inoEndLock, inoFifoLock);
@@ -1022,7 +1034,6 @@ namespace mtfs {
 		}
 		inoEndLock.unlock();
 		inoFifoLock.unlock();
-
 		fuse_reply_buf(req, buf, size - rem);
 	}
 

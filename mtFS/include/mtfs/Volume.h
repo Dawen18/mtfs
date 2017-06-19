@@ -7,6 +7,7 @@
 #include <pluginSystem/Plugin.h>
 #include <mtfs/structs.h>
 #include <rapidjson/document.h>
+#include "Acces.h"
 
 namespace mtfs {
 	class Volume {
@@ -14,11 +15,6 @@ namespace mtfs {
 		static constexpr const char *VOLUMES = "volumes";
 
 	private:
-		enum queryType {
-			INODE,
-			DIR_BLOCK,
-			BLOCK,
-		};
 
 		pluginSystem::Plugin *plugin;
 		std::map<uint64_t, uint64_t> blocksAccess;
@@ -51,42 +47,22 @@ namespace mtfs {
 
 		std::vector<ident_st> getInodesAboveLimit();
 
-		int addInode(uint64_t &inodeId);
-
-		int addInode(std::vector<uint64_t> &ids, const int nb);
-
-		int delInode(const uint64_t &inodeId);
-
-		int getInode(const uint64_t &inodeId, mtfs::inode_st &inode);
-
-		int putInode(const uint64_t &inodeId, const inode_t &inode);
-
-		int addDirBlock(uint64_t &blockId);
-
-		int addDirBlock(std::vector<uint64_t> &ids, const int nb);
-
-		int delDirBlock(const std::uint64_t &blockId);
-
-		int getDirBlock(const std::uint64_t &blockId, dirBlock_t &block);
-
-		int putDirBlock(const std::uint64_t &blockId, const dirBlock_t &block);
-
-		int addBlock(std::uint64_t &blockId);
-
-		int addBlock(std::vector<uint64_t> &ids, const int nb);
-
-		bool delBlock(std::uint64_t blockId);
-
-		bool getBlock(std::uint64_t blockId, std::uint8_t *buffer);
-
-		int putBlock(const uint64_t blockId, const uint8_t *buffer);
-
 		bool getSuperblock(mtfs::superblock_t &superblock);
 
 		bool putSuperblock(superblock_t &superblock);
 
+		int add(uint64_t &id, const Acces::queryType type);
+
+		int add(std::vector<uint64_t> &ids, const int nb, const Acces::queryType type);
+
+		int del(const uint64_t &id, const Acces::queryType type);
+
+		int get(const uint64_t &id, void *data, Acces::queryType type);
+
+		int put(const uint64_t &id, const void *data, Acces::queryType type);
+
+
 	private:
-		int add(std::vector<uint64_t> &ids, const int nb, const queryType &type);
 
 		bool uptadeLastAcces(uint64_t id, std::map<uint64_t, std::vector<uint64_t>> map);
 	};

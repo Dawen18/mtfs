@@ -7,9 +7,7 @@
 #include <iostream>
 #include <assert.h>
 
-#include "mtfs/DirectoryBlockAccess.h"
-#include "mtfs/BlockAccess.h"
-#include "mtfs/InodeAcces.h"
+#include "mtfs/Acces.h"
 #include "mtfs/InodeCache.h"
 #include "mtfs/BlockCache.h"
 #include "mtfs/DirectoryEntryCache.h"
@@ -17,7 +15,7 @@
 #include "Mtfs.h"
 
 namespace mtfs {
-	class PoolManager : public DirectoryBlockAccess, public BlockAccess, public InodeAcces {
+	class PoolManager : public Acces {
 	public:
 		static const int SUCCESS = 0;
 		static const int POOL_ID_EXIST = 1;
@@ -25,11 +23,7 @@ namespace mtfs {
 		static const int IS_LOCKED = 3;
 
 	private:
-		enum queryType {
-			INODE,
-			DIR_BLOCK,
-			BLOCK,
-		};
+
 
 		std::map<uint32_t, Pool *> pools;
 		std::map<uint32_t, Rule *> rules;
@@ -55,33 +49,15 @@ namespace mtfs {
 
 		int addPool(uint32_t poolId, Pool *pool, Rule *rule);
 
-		int addBlock(const ruleInfo_t &infos, std::vector<ident_t> &ident, const int nb) override;
+		int add(const ruleInfo_t &info, std::vector<ident_t> &ids, const Acces::queryType type, const int nb) override;
 
-		bool delBlock(inode_st &inode) override;
+		int del(const ident_t &id, const Acces::queryType type) override;
 
-		int getBlock(const ident_t &blockId, uint8_t *buffer) override;
+		int get(const ident_t &id, void *data, const Acces::queryType type) override;
 
-		int putBlock(const ident_t &blockId, uint8_t *buffer) override;
-
-		int addDirBlock(const ruleInfo_t &infos, std::vector<ident_t> &blockId, const int nb) override;
-
-		int delDirBlock(const ident_t &blockId) override;
-
-		int getDirBlock(const ident_t &blockId, dirBlock_t &block) override;
-
-		int putDirBlock(const ident_t &blockId, const dirBlock_t &block) override;
-
-		int addInode(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb) override;
-
-		int delInode(const ident_t &inodeId) override;
-
-		int getInode(const ident_t &inodeId, inode_st &inode) override;
-
-		int putInode(const ident_t &inodeId, const inode_t &inode) override;
+		int put(const ident_t &id, const void *data, const Acces::queryType type) override;
 
 	private:
-
-		int add(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb, const queryType type);
 
 		bool isLocked(const ident_t &id, const queryType &type);
 

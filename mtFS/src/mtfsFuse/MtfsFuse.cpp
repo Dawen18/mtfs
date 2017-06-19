@@ -56,6 +56,10 @@ namespace mtfsFuse {
 		mtfs::Mtfs::getInstance()->access(req, ino, mask);
 	}
 
+	void MtfsFuse::readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) {
+		mtfs::Mtfs::getInstance()->readdir(req, ino, size, off, fi);
+	}
+
 	void MtfsFuse::readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) {
 		mtfs::Mtfs::getInstance()->readdirplus(req, ino, size, off, fi);
 	}

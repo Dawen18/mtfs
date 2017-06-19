@@ -7,6 +7,7 @@
 #include <mtfs/Volume.h>
 #include <mtfs/Rule.h>
 #include <pluginSystem/Plugin.h>
+#include "Acces.h"
 
 namespace mtfs {
 	class Pool {
@@ -20,17 +21,10 @@ namespace mtfs {
 
 
 	private:
-		enum queryType {
-			INODE,
-			DIR_BLOCK,
-			BLOCK,
-		};
 
 		std::map<uint32_t, Volume *> volumes;
 
 		std::map<uint32_t, Rule *> rules;
-
-		int blockSize;
 
 
 	public:
@@ -45,44 +39,16 @@ namespace mtfs {
 
 		int addVolume(uint32_t volumeId, Volume *volume, Rule *rule);
 
-		int addInode(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb = 1);
+		int add(const ruleInfo_t &info, std::vector<ident_t> &idents, const Acces::queryType type, const int nb = 1);
 
-		bool delInode(uint16_t volumeId, uint64_t inodeId);
+		int del(const uint32_t &volumeId, const uint64_t &id, const Acces::queryType type);
 
-		int getInode(const uint32_t &volumeId, const uint64_t &inodeId, inode_t &inode);
+		int get(const uint32_t &volumeId, const uint64_t &id, void *data, const Acces::queryType type);
 
-		int putInode(const uint32_t &volumeId, const uint64_t &inodeId, const inode_t &inode);
-
-		int addDirBlock(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb = 1);
-
-		int delDirBlock(const uint32_t &volumeId, const uint64_t &id);
-
-		int getDirBlock(const uint32_t &volumeId, const uint64_t &id, dirBlock_t &block);
-
-		int putDirBlock(const uint32_t &volumeId, const uint64_t &id, const dirBlock_t &block);
-
-		int addBlock(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb = 1);
-
-		bool delBlock(uint16_t volumeId, uint64_t blockId);
-
-		bool readBlock(uint16_t volumeId, uint64_t blockId, uint8_t *block);
-
-		int putBlock(const uint32_t &volumeId, const uint64_t &blockId, const uint8_t *block);
-
-
-		std::vector<superblock_t> readSuperblocks();
-
-		bool writeSuperblocks(superblock_t baseSuperblock);
-
-		void setBlockInfo(ident_t blockId, blockInfo_t &info);
-
-		void getBlockInfo(ident_t blockId, blockInfo_t &info);
-
-		void moveBlocks(std::vector<move_t> &asMoved, std::vector<ident_t> &needOtherPool);
+		int put(const uint32_t &volumeId, const uint64_t &id, const void *data, const Acces::queryType type);
 
 
 	private:
-		int add(const ruleInfo_t &info, std::vector<ident_t> &idents, const int nb, const queryType &type);
 
 		int getValidVolumes(const ruleInfo_t &info, std::vector<uint32_t> &volumeIds);
 	};

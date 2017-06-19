@@ -1,11 +1,9 @@
 
 set(FS_HEAD
-		include/mtfs/BlockAccess.h
 		include/mtfs/BlockCache.h
 		include/mtfs/Cache.h
-		include/mtfs/DirectoryBlockAccess.h
 		include/mtfs/DirectoryEntryCache.h
-		include/mtfs/InodeAcces.h
+		include/mtfs/Acces.h
 		include/mtfs/InodeCache.h
 		include/mtfs/Mtfs.h
 		include/mtfs/Pool.h
