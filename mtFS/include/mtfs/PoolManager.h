@@ -49,7 +49,7 @@ namespace mtfs {
 
 		int addPool(uint32_t poolId, Pool *pool, Rule *rule);
 
-		int add(const ruleInfo_t &info, std::vector<ident_t> &ids, const Acces::queryType type, const int nb) override;
+		int add(const ruleInfo_t &info, std::vector<ident_t> &ids, const Acces::queryType type, const size_t nb) override;
 
 		int del(const ident_t &id, const Acces::queryType type) override;
 

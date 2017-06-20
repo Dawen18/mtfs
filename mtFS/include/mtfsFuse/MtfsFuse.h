@@ -46,6 +46,15 @@ namespace mtfsFuse {
 		void releasedir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) override;
 
 		void readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) override;
+
+		void mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode) override;
+
+		void
+		write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off_t off, fuse_file_info *fi) override;
+
+		void write_buf(fuse_req_t req, fuse_ino_t ino, fuse_bufvec *bufv, off_t off, fuse_file_info *fi) override;
+
+		void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) override;
 	};
 
 }  // namespace mtfsFuse

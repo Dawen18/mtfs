@@ -8,8 +8,6 @@
 #include <boost/filesystem.hpp>
 #include <grp.h>
 #include <pwd.h>
-#include <mutex>
-#include <condition_variable>
 
 #define HOME "/home/david/Cours/4eme/Travail_bachelor/Home/"
 #define SYSTEMS_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Systems/"
@@ -182,19 +180,19 @@ namespace mtfs {
 
 		rapidjson::Value v;
 
-		v.SetInt(sb.iCacheSz);
+		v.SetUint((unsigned int) sb.iCacheSz);
 		d.AddMember(rapidjson::StringRef(Mtfs::INODE_CACHE), v, allocator);
 
-		v.SetInt(sb.dCacheSz);
+		v.SetUint((unsigned int) sb.dCacheSz);
 		d.AddMember(rapidjson::StringRef(Mtfs::DIR_CACHE), v, allocator);
 
-		v.SetInt(sb.bCacheSz);
+		v.SetUint((unsigned int) sb.bCacheSz);
 		d.AddMember(rapidjson::StringRef(Mtfs::BLOCK_CACHE), v, allocator);
 
-		v.SetInt(sb.blockSz);
+		v.SetUint((unsigned int) sb.blockSz);
 		d.AddMember(rapidjson::StringRef(Mtfs::BLOCK_SIZE_ST), v, allocator);
 
-		v.SetInt(sb.redundancy);
+		v.SetUint((unsigned int) sb.redundancy);
 		d.AddMember(rapidjson::StringRef(Mtfs::REDUNDANCY), v, allocator);
 
 		v.SetInt(sb.migration);
@@ -223,19 +221,19 @@ namespace mtfs {
 
 	void Mtfs::jsonToStruct(rapidjson::Document &d, superblock_t &sb) {
 		assert(d.HasMember(INODE_CACHE));
-		sb.iCacheSz = d[INODE_CACHE].GetInt();
+		sb.iCacheSz = d[INODE_CACHE].GetUint();
 
 		assert(d.HasMember(DIR_CACHE));
-		sb.dCacheSz = d[DIR_CACHE].GetInt();
+		sb.dCacheSz = d[DIR_CACHE].GetUint();
 
 		assert(d.HasMember(BLOCK_CACHE));
-		sb.bCacheSz = d[BLOCK_CACHE].GetInt();
+		sb.bCacheSz = d[BLOCK_CACHE].GetUint();
 
 		assert(d.HasMember(BLOCK_SIZE_ST));
-		sb.blockSz = d[BLOCK_SIZE_ST].GetInt();
+		sb.blockSz = d[BLOCK_SIZE_ST].GetUint();
 
 		assert(d.HasMember(REDUNDANCY));
-		sb.redundancy = d[REDUNDANCY].GetInt();
+		sb.redundancy = d[REDUNDANCY].GetUint();
 
 		assert(d.HasMember(Rule::MIGRATION));
 		sb.migration = d[Rule::MIGRATION].GetInt();
@@ -340,7 +338,7 @@ namespace mtfs {
 	}
 
 	void Mtfs::lookup(fuse_req_t req, fuse_ino_t parent, const string name) {
-		cout << "parent: " << parent << " name: " << name << endl;
+//		cout << "parent: " << parent << " name: " << name << endl;
 
 		internalInode_st *parentInode = this->getIntInode(parent);
 
@@ -400,7 +398,7 @@ namespace mtfs {
 		}
 
 		do {
-			ret = this->inodes->get(inodeIds.back(), &inode->inode, Acces::DATA_BLOCK);
+			ret = this->inodes->get(inodeIds.back(), &inode->inode, Acces::INODE);
 			inodeIds.pop_back();
 			if (inodeIds.empty())
 				break;
@@ -438,6 +436,36 @@ namespace mtfs {
 
 //		Create and write new inode
 		internalInode_st *inode = this->newInode(mode, fuse_req_ctx(req));
+		vector<ident_t> inodeIdents;
+		if (0 != (ret = this->insertInode(inode->inode, inodeIdents))) {
+			delete inode;
+			fuse_reply_err(req, ret);
+			return;
+		}
+
+//			Add entry in dir
+		if (0 != (ret = this->addEntry(parentInode, name, inodeIdents))) {
+			delete inode;
+			fuse_reply_err(req, ret);
+			return;
+		}
+
+//			reply to fuse
+		fuse_entry_param param;
+		memset(&param, 0, sizeof(fuse_entry_param));
+
+		this->buildParam(*inode, param);
+
+		fuse_reply_entry(req, &param);
+	}
+
+	void Mtfs::mkdir(fuse_req_t req, fuse_ino_t ino, const char *name, mode_t mode) {
+		int ret;
+		internalInode_st *parentInode = this->getIntInode(ino);
+
+//		Create and write new inode
+		internalInode_st *inode = this->newInode(mode, fuse_req_ctx(req));
+		inode->inode.accesRight |= S_IFDIR;
 		vector<ident_t> inodeIdents;
 		if (0 != (ret = this->insertInode(inode->inode, inodeIdents))) {
 			delete inode;
@@ -530,21 +558,34 @@ namespace mtfs {
 	}
 
 	void Mtfs::open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-		internalInode_st *inode = getIntInode(ino);
+		(void) ino;
+//		internalInode_st *inode = getIntInode(ino);
 
-		if (!inode->inode.dataBlocks.empty()) {
-			uint8_t *firstBlock = (uint8_t *) malloc(this->blockSize * sizeof(uint8_t));
+//		if (!inode->inode.dataBlocks.empty()) {
+//			uint8_t *firstBlock = (uint8_t *) malloc(this->blockSize * sizeof(uint8_t));
+//
+//			this->blocks->get(inode->inode.dataBlocks.front().front(), &firstBlock, Acces::DATA_BLOCK);
+//			fi->fh = (uint64_t) firstBlock;
+//		} else
+//			fi->fh = 0;A
 
-			this->blocks->get(inode->inode.dataBlocks.front().front(), &firstBlock, Acces::DATA_BLOCK);
-			fi->fh = (uint64_t) firstBlock;
-		} else
-			fi->fh = 0;
+		fd_st *fd = new fd_st();
+		fd->blockT = fd->DATA;
+		fd->blkDl.dlThPool = new pool(this->SIMULT_DL);
+		fd->blkDl.sem = new Semaphore();
+		fd->blkDl.fifoMu = new mutex();
+		fd->blkDl.endMu = new mutex();
+		fd->blkDl.fifo.blkQueue = new queue<uint8_t *>();
+		fd->inoDl.dlThPool = new pool(this->SIMULT_UP);
+
+		fi->fh = (uint64_t) fd;
 
 		fuse_reply_open(req, fi);
 	}
 
 	void Mtfs::release(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
-		internalInode_st *intIno = this->getIntInode(ino);
+		(void) ino;
+//		internalInode_st *intIno = this->getIntInode(ino);
 
 		delete (uint8_t *) fi->fh;
 		fi->fh = 0;
@@ -597,6 +638,155 @@ namespace mtfs {
 		fi->fh = 0;
 
 		fuse_reply_err(req, SUCCESS);
+	}
+
+	void Mtfs::write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off_t off, fuse_file_info *fi) {
+		(void) ino, buf, size, off, fi;
+//		internalInode_st *inode = this->getIntInode(ino);
+//
+//		int startBlock = (int) (off / this->blockSize);
+//
+//		fuse_reply_write(req, size);
+		fuse_reply_err(req, ENOSYS);
+	}
+
+	void Mtfs::write_buf(fuse_req_t req, fuse_ino_t ino, fuse_bufvec *bufv, off_t off, fuse_file_info *fi) {
+		int ret = 0;
+
+		fd_st *fd = (fd_st *) fi->fh;
+
+		internalInode_st *inode = this->getIntInode(ino);
+
+		size_t size = bufv->buf[0].size;
+		int firstBlock = (int) (off / this->blockSize);
+		int lastBlock = (int) ((off + size - 1) / this->blockSize);
+
+		ruleInfo_t newBlockInfo = ruleInfo_st();
+		newBlockInfo.gid = inode->inode.gid;
+		newBlockInfo.uid = inode->inode.uid;
+		newBlockInfo.lastAccess = this->now();
+
+		size_t rem = size;
+		size_t write = 0;
+
+		vector<uint64_t> toFree;
+
+		for (int blockToWrite = firstBlock; blockToWrite <= lastBlock; ++blockToWrite) {
+			uint8_t *block = (uint8_t *) calloc(sizeof(uint8_t), this->blockSize);
+			memset(block, 0, this->blockSize);
+
+			vector<ident_t> blockIdents;
+			if (0 == inode->inode.dataBlocks.size() || inode->inode.dataBlocks.size() <= blockToWrite) {
+				if (SUCCESS !=
+					(ret = this->blocks->add(newBlockInfo, blockIdents, Acces::DATA_BLOCK,
+											 (const int) this->redundancy))) {
+					fuse_reply_err(req, ret);
+					return;
+				}
+
+				inode->inode.dataBlocks.push_back(blockIdents);
+			} else {
+				blockIdents = inode->inode.dataBlocks[blockToWrite];
+
+				for (auto &&id: blockIdents) {
+					ret = this->blocks->get(id, block, Acces::DATA_BLOCK);
+					if (SUCCESS == ret)
+						break;
+				}
+				if (SUCCESS != ret)
+					return (void) fuse_reply_err(req, ret);
+			}
+
+			size_t startPos = blockToWrite == firstBlock ? off % this->blockSize : 0;
+			size_t endPos = blockToWrite == lastBlock ? rem % (this->blockSize + 1) : this->blockSize;
+
+			memcpy(block + startPos, bufv->buf->mem, endPos);
+			write += endPos;
+			rem -= endPos;
+
+			for (auto &&id: blockIdents) {
+				if (id.poolId != 1 || id.poolId != 2)
+					throw out_of_range("pool id invalide");
+				fd->blkDl.dlThPool->schedule(bind(&Acces::put, this->blocks, id, block, Acces::DATA_BLOCK));
+			}
+
+			toFree.push_back((uint64_t) block);
+		}
+
+		uint8_t *data = (uint8_t *) malloc(size * sizeof(uint8_t));
+		memcpy(data, bufv->buf[0].mem, bufv->buf[0].size);
+
+		inode->inode.size = off + size;
+
+//		TODO supprimer les block en trop.
+		vector<ident_t> toDel;
+		if (inode->inode.dataBlocks.size() > lastBlock + 1) {
+			for (auto blks = inode->inode.dataBlocks.begin(); blks != inode->inode.dataBlocks.end(); blks++) {
+				for (auto &&id: *blks) {
+					toDel.push_back(id);
+				}
+			}
+
+			inode->inode.dataBlocks.erase(inode->inode.dataBlocks.begin() + lastBlock + 1,
+										  inode->inode.dataBlocks.end());
+		}
+
+		for (auto &&id: inode->idents) {
+			fd->inoDl.dlThPool->schedule(bind(&Acces::put, this->inodes, id, &inode->inode, Acces::INODE));
+		}
+
+		fd->blkDl.dlThPool->wait();
+		fd->inoDl.dlThPool->wait();
+
+		fuse_reply_write(req, write);
+
+		pool delPool(this->redundancy);
+		for (auto &&id: toDel) {
+			delPool.schedule(bind(&Acces::del, this->blocks, id, Acces::DATA_BLOCK));
+		}
+
+		for (auto &&ptr: toFree) {
+			free((uint8_t *) ptr);
+		}
+	}
+
+	void Mtfs::read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) {
+		(void) fi;
+		internalInode_st *inode = this->getIntInode(ino);
+
+
+		size = min(size, inode->inode.size);
+		int firstBlock = (int) (off / this->blockSize);
+		int lastBlock = (int) ((off + size - 1) / this->blockSize);
+
+		size_t rem = size;
+		size_t read = 0;
+
+		char *buf = new char[size];
+		char *p = buf;
+
+		for (int blockToRead = firstBlock; blockToRead <= lastBlock; blockToRead++) {
+			uint8_t block[this->blockSize];
+			if (SUCCESS != this->blocks->get(inode->inode.dataBlocks[blockToRead][0], block, Acces::DATA_BLOCK)) {
+				delete[]buf;
+				fuse_reply_err(req, EAGAIN);
+
+				return;
+			}
+
+			size_t startPos = blockToRead == firstBlock ? off % this->blockSize : 0;
+			size_t endPos = blockToRead == lastBlock ? rem % (this->blockSize + 1) : this->blockSize;
+
+			size_t toCopy = endPos - startPos;
+			memcpy(p, block + startPos, toCopy);
+
+			rem -= toCopy;
+			read += toCopy;
+			p += toCopy;
+		}
+
+		fuse_reply_buf(req, buf, read);
+		delete[]buf;
 	}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -820,7 +1010,7 @@ namespace mtfs {
 		int ret;
 
 //		get new inode idents
-		if (0 != (ret = this->inodes->add(this->getRuleInfo(inode), idents, Acces::DATA_BLOCK, this->redundancy))) {
+		if (0 != (ret = this->inodes->add(this->getRuleInfo(inode), idents, Acces::INODE, this->redundancy))) {
 			return ret;
 		}
 
@@ -835,6 +1025,14 @@ namespace mtfs {
 		return ret;
 	}
 
+	/**
+	 * Download all blocks in inode
+	 *
+	 * @param inode Inode who containe the blocks
+	 * @param dlSt Download struct
+	 * @param type Type of block to dowload DIR_BLOCK | DATA_BLOCK
+	 * @param firstBlockIdx Index of first block to download
+	 */
 	void Mtfs::dlBlocks(const inode_t &inode, dl_st *dlSt, const blockType type, const int firstBlockIdx) {
 //		TODO implements
 
@@ -1006,8 +1204,8 @@ namespace mtfs {
 
 			fd->inoDl.sem->wait();
 
-//			internalInode_st inInode;
-			shared_ptr<internalInode_st> intInode(new internalInode_st());
+			internalInode_st *intInode = new internalInode_st();
+//			shared_ptr<internalInode_st> intInode(new internalInode_st());
 			lock(inoEndLock, inoFifoLock);
 			if (fd->inoDl.end && 0 == fd->inoDl.fifo.inodeQueue->size())
 				break;
@@ -1026,11 +1224,12 @@ namespace mtfs {
 				break;
 			}
 
-			p += entrySize;
+//			p += entrySize;
 			rem -= entrySize;
 			currSize += entrySize;
 
 			lock(inoEndLock, inoFifoLock);
+			break;
 		}
 		inoEndLock.unlock();
 		inoFifoLock.unlock();
@@ -1042,12 +1241,11 @@ namespace mtfs {
 		size_t entSize = 0;
 
 		if (plus) {
-			fuse_entry_param param;
-			memset(&param, 0, sizeof(fuse_entry_param));
-			buildParam(inode, param);
+			fuse_entry_param *p = new fuse_entry_param();
+			buildParam(inode, *p);
 
 			entSize += fuse_add_direntry_plus(req, NULL, 0, name.c_str(), NULL, 0);
-			fuse_add_direntry_plus(req, buf, entSize, name.c_str(), &param, currentSize + entSize);
+			fuse_add_direntry_plus(req, buf, entSize, name.c_str(), p, currentSize + entSize);
 		} else {
 			struct stat stbuf;
 			memset(&stbuf, 0, sizeof(stbuf));
@@ -1059,28 +1257,14 @@ namespace mtfs {
 		return entSize;
 	}
 
-	void Mtfs::getInode(vector<ident_t> &ids, inode_t &inode) {}
-
 	void Mtfs::buildParam(const internalInode_st &inode, fuse_entry_param &param) {
 		param.ino = (fuse_ino_t) &inode;
 
 		this->buildStat(inode, param.attr);
-//		param.attr.st_dev = 0;
-//		param.attr.st_ino = (ino_t) &inode;
-//		param.attr.st_mode = inode.accesRight;
-//		param.attr.st_nlink = inode.linkCount;
-//		param.attr.st_uid = inode.uid;
-//		param.attr.st_gid = inode.gid;
-//		param.attr.st_size = inode.size;
-//		param.attr.st_atim.tv_sec = inode.atime;
-//		param.attr.st_ctim.tv_sec = inode.atime;
-//		param.attr.st_mtim.tv_sec = inode.atime;
-//		param.attr.st_blksize = instance->blockSize;
-//		param.attr.st_blocks = inode.dataBlocks.size();
 
 		param.generation = 1;
-		param.attr_timeout = 1.0;
-		param.entry_timeout = 1.0;
+		param.attr_timeout = 0.0;
+		param.entry_timeout = 0.0;
 	}
 
 	void Mtfs::buildStat(const internalInode_st &inode, struct stat &st) {

@@ -224,11 +224,11 @@ namespace mtfs {
 	} pool_t;
 
 	typedef struct superblock_st {
-		int iCacheSz;
-		int dCacheSz;
-		int bCacheSz;
-		int blockSz;
-		int redundancy;
+		size_t iCacheSz;
+		size_t dCacheSz;
+		size_t bCacheSz;
+		size_t blockSz;
+		size_t redundancy;
 		int migration;
 		std::map<uint32_t, pool_t> pools;
 		std::vector<ident_t> rootInodes;

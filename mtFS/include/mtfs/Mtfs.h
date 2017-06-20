@@ -30,6 +30,10 @@ namespace mtfs {
 		static constexpr const char *ROOT_INODES = "rootInodes";
 
 
+		void write_buf(fuse_req_t req, fuse_ino_t ino, fuse_bufvec *bufv, off_t off, fuse_file_info *fi);
+
+		void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
+
 	private:
 //		CONFIG
 		static const size_t SIMULT_DL = 2;
@@ -50,8 +54,8 @@ namespace mtfs {
 		static boost::threadpool::pool *threadPool;
 		static std::string systemName;
 
-		int redundancy;
-		int blockSize;
+		size_t redundancy;
+		size_t blockSize;
 		int maxEntryPerBlock;
 		internalInode_st *rootIn;
 
@@ -103,6 +107,10 @@ namespace mtfs {
 
 		void releasedir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
 
+		void mkdir(fuse_req_t req, fuse_ino_t ino, const char *name, mode_t mode);
+
+		void write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off_t off, fuse_file_info *fi);
+
 	private:
 
 		Mtfs();
@@ -142,8 +150,6 @@ namespace mtfs {
 
 		size_t dirBufAdd(fuse_req_t &req, char *buf, size_t &currentSize, std::string name, internalInode_st &inode,
 						 const bool &plus);
-
-		void getInode(std::vector<ident_t> &ids, inode_t &inode);
 
 		void buildParam(const internalInode_st &inode, fuse_entry_param &param);
 

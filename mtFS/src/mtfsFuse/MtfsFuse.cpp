@@ -40,6 +40,10 @@ namespace mtfsFuse {
 		mtfs::Mtfs::getInstance()->mknod(req, parent, name, mode, rdev);
 	}
 
+	void MtfsFuse::mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode) {
+		mtfs::Mtfs::getInstance()->mkdir(req, parent, name, mode);
+	}
+
 	void MtfsFuse::open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
 		mtfs::Mtfs::getInstance()->open(req, ino, fi);
 	}
@@ -66,6 +70,18 @@ namespace mtfsFuse {
 
 	void MtfsFuse::releasedir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
 		mtfs::Mtfs::getInstance()->releasedir(req, ino, fi);
+	}
+
+	void MtfsFuse::write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off_t off, fuse_file_info *fi) {
+		mtfs::Mtfs::getInstance()->write(req, ino, buf, size, off, fi);
+	}
+
+	void MtfsFuse::write_buf(fuse_req_t req, fuse_ino_t ino, fuse_bufvec *bufv, off_t off, fuse_file_info *fi) {
+		mtfs::Mtfs::getInstance()->write_buf(req, ino, bufv, off, fi);
+	}
+
+	void MtfsFuse::read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) {
+		mtfs::Mtfs::getInstance()->read(req, ino, size, off, fi);
 	}
 
 }  // namespace mtfsFuse

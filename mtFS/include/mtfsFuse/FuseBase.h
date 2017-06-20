@@ -63,8 +63,7 @@ namespace mtfsFuse {
 
 		virtual void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
 
-		virtual void
-		write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off_t off, fuse_file_info *fi);
+		virtual void write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off_t off, fuse_file_info *fi);
 
 		virtual void flush(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
 

@@ -25,7 +25,8 @@ namespace mtfs {
 		return SUCCESS;
 	}
 
-	int PoolManager::add(const ruleInfo_t &info, std::vector<ident_t> &ids, const Acces::queryType type, const int nb) {
+	int PoolManager::add(const ruleInfo_t &info, std::vector<ident_t> &ids, const Acces::queryType type,
+						 const size_t nb) {
 		int ret;
 		vector<uint32_t> poolIds;
 		if (0 != (ret = this->getValidPools(info, poolIds))) {
