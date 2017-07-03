@@ -1,5 +1,4 @@
 #include <pluginSystem/PluginManager.h>
-#include <pluginSystem/Plugin.h>
 #include <thread>
 #include <boost/thread.hpp>
 #include <boost/threadpool/pool.hpp>
@@ -77,58 +76,22 @@ namespace mtfs {
 
 	Volume::Volume(pluginSystem::Plugin *plugin) : plugin(plugin) {}
 
-	bool Volume::setTimeLimits(int low, int high) {
-		return false;
-	}
-
 	void Volume::getBlockInfo(uint64_t blockId, blockInfo_t &info) {
 	}
 
 	void Volume::setBlockInfo(uint64_t blockId, blockInfo_t &info) {
 	}
 
-	std::vector<ident_t> Volume::getBlocksBelowLimit() {
-		vector<ident_t> blocks;
-
-		return blocks;
-	}
-
-	std::vector<ident_t> Volume::getBlocksAboveLimit() {
-		vector<ident_t> blocks;
-
-		return blocks;
-	}
-
-	std::vector<ident_t> Volume::getInodesBelowLimit() {
-		vector<ident_t> blocks;
-
-		return blocks;
-	}
-
-	std::vector<ident_t> Volume::getInodesAboveLimit() {
-		vector<ident_t> blocks;
-
-		return blocks;
-	}
-
-	bool Volume::getSuperblock(mtfs::superblock_t &superblock) {
-		return plugin->getSuperblock(superblock);
-	}
-
-	bool Volume::putSuperblock(superblock_t &superblock) {
-		return plugin->putSuperblock(superblock);
-	}
-
-	int Volume::add(uint64_t &id, const Acces::queryType type) {
+	int Volume::add(uint64_t &id, const queryType type) {
 		int ret;
 		switch (type) {
-			case Acces::INODE:
+			case INODE:
 				ret = this->plugin->addInode(&id);
 				break;
-			case Acces::DIR_BLOCK:
+			case DIR_BLOCK:
 				ret = this->plugin->addDirBlock(&id);
 				break;
-			case Acces::DATA_BLOCK:
+			case DATA_BLOCK:
 				ret = this->plugin->addBlock(&id);
 				break;
 			default:
@@ -139,7 +102,7 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Volume::add(std::vector<uint64_t> &ids, const int nb, const Acces::queryType type) {
+	int Volume::add(std::vector<uint64_t> &ids, const int nb, const queryType type) {
 		boost::threadpool::pool thPool((size_t) nb);
 
 		vector<uint64_t *> tmp;
@@ -147,13 +110,13 @@ namespace mtfs {
 			uint64_t *id = new uint64_t();
 			tmp.push_back(id);
 			switch (type) {
-				case Acces::INODE:
+				case INODE:
 					thPool.schedule(bind(&pluginSystem::Plugin::addInode, this->plugin, id));
 					break;
-				case Acces::DIR_BLOCK:
+				case DIR_BLOCK:
 					thPool.schedule(bind(&pluginSystem::Plugin::addDirBlock, this->plugin, id));
 					break;
-				case Acces::DATA_BLOCK:
+				case DATA_BLOCK:
 					thPool.schedule(bind(&pluginSystem::Plugin::addBlock, this->plugin, id));
 					break;
 				default:
@@ -172,17 +135,17 @@ namespace mtfs {
 		return 0;
 	}
 
-	int Volume::del(const uint64_t &id, const Acces::queryType type) {
+	int Volume::del(const uint64_t &id, const queryType type) {
 		int ret;
 
 		switch (type) {
-			case Acces::INODE:
+			case INODE:
 				ret = this->plugin->delInode(id);
 				break;
-			case Acces::DIR_BLOCK:
+			case DIR_BLOCK:
 				ret = this->plugin->delDirBlock(id);
 				break;
-			case Acces::DATA_BLOCK:
+			case DATA_BLOCK:
 				ret = this->plugin->delBlock(id);
 				break;
 			default:
@@ -194,17 +157,17 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Volume::get(const uint64_t &id, void *data, Acces::queryType type) {
+	int Volume::get(const uint64_t &id, void *data, queryType type) {
 		int ret;
 
 		switch (type) {
-			case Acces::INODE:
+			case INODE:
 				ret = this->plugin->getInode(id, *(inode_t *) data);
 				break;
-			case Acces::DIR_BLOCK:
+			case DIR_BLOCK:
 				ret = this->plugin->getDirBlock(id, *(dirBlock_t *) data);
 				break;
-			case Acces::DATA_BLOCK:
+			case DATA_BLOCK:
 				ret = this->plugin->getBlock(id, (uint8_t *) data);
 				break;
 			default:
@@ -213,20 +176,22 @@ namespace mtfs {
 				break;
 		}
 
+		this->updateLastAccess(id, type);
+
 		return ret;
 	}
 
-	int Volume::put(const uint64_t &id, const void *data, Acces::queryType type) {
+	int Volume::put(const uint64_t &id, const void *data, queryType type) {
 		int ret;
 
 		switch (type) {
-			case Acces::INODE:
+			case INODE:
 				ret = this->plugin->putInode(id, *(inode_t *) data);
 				break;
-			case Acces::DIR_BLOCK:
+			case DIR_BLOCK:
 				ret = this->plugin->putDirBlock(id, *(dirBlock_t *) data);
 				break;
-			case Acces::DATA_BLOCK:
+			case DATA_BLOCK:
 				ret = this->plugin->putBlock(id, (uint8_t *) data);
 				break;
 			default:
@@ -238,7 +203,11 @@ namespace mtfs {
 		return ret;
 	}
 
-	bool Volume::uptadeLastAcces(uint64_t id, std::map<uint64_t, std::vector<uint64_t>> map) {
+	void Volume::accept(Visitor *v) {
+		v->visit(this);
+	}
+
+	bool Volume::updateLastAccess(const uint64_t &id, const queryType type) {
 		return false;
 	}
 

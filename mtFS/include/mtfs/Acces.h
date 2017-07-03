@@ -7,16 +7,13 @@
 #include <iostream>
 #include <assert.h>
 #include <mtfs/structs.h>
-#include "structs.h"
+#include <mtfs/Rule.h>
 
 namespace mtfs {
+	typedef struct ruleInfo_st ruleInfo_t;
+
 	class Acces {
 	public:
-		enum queryType {
-			INODE,
-			DIR_BLOCK,
-			DATA_BLOCK,
-		};
 
 		virtual ~Acces() {};
 

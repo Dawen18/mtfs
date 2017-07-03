@@ -15,7 +15,6 @@
 #include <list>
 #include <iostream>
 #include <assert.h>
-#include <mtfs/structs.h>
 #include <rapidjson/schema.h>
 
 /**
@@ -85,14 +84,22 @@ namespace mtfs {
 		static Rule *buildRule(int migration, const rapidjson::Value &value);
 
 		/**
+		 * Dump object to Json.
+		 *
+		 * @param json
+		 * @param allocator
+		 * @return
+		 */
+		virtual bool toJson(rapidjson::Value &json, rapidjson::Document::AllocatorType &allocator)=0;
+
+		/**
 		 * @brief Check if the block or inode satisfy rules.
 		 * @param info Info of Block/Inode
 		 *
 		 * @return true or false.
 		 */
-		virtual bool satisfyRules(ruleInfo_st info)=0;
+		virtual bool satisfyRules(mtfs::ruleInfo_t info)=0;
 
-		virtual bool toJson(rapidjson::Value &json, rapidjson::Document::AllocatorType &allocator)=0;
 	};
 
 }  // namespace mtfs

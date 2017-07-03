@@ -100,4 +100,5 @@ namespace mtfs {
 
 		return true;
 	}
+
 }  // namespace mtfs

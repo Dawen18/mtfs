@@ -4,21 +4,25 @@
 #include <string>
 #include <vector>
 
-#include <pluginSystem/Plugin.h>
-#include <mtfs/structs.h>
 #include <rapidjson/document.h>
-#include "Acces.h"
+#include <mtfs/structs.h>
+#include <pluginSystem/Plugin.h>
+#include "Visitor.h"
 
 namespace mtfs {
 	class Volume {
+		friend class Migrator;
+
 	public:
 		static constexpr const char *VOLUMES = "volumes";
 
 	private:
 
 		pluginSystem::Plugin *plugin;
-		std::map<uint64_t, uint64_t> blocksAccess;
+
 		std::map<uint64_t, uint64_t> inodesAccess;
+		std::map<uint64_t, uint64_t> dirBlockAccess;
+		std::map<uint64_t, uint64_t> blocksAccess;
 
 
 	public:
@@ -33,38 +37,24 @@ namespace mtfs {
 
 		Volume(pluginSystem::Plugin *plugin);
 
-		bool setTimeLimits(int low, int high);
-
 		void getBlockInfo(uint64_t blockId, blockInfo_st &info);
 
 		void setBlockInfo(uint64_t blockId, blockInfo_st &info);
 
-		std::vector<ident_st> getBlocksBelowLimit();
+		int add(uint64_t &id, const queryType type);
 
-		std::vector<ident_st> getBlocksAboveLimit();
+		int add(std::vector<uint64_t> &ids, const int nb, const queryType type);
 
-		std::vector<ident_st> getInodesBelowLimit();
+		int del(const uint64_t &id, const queryType type);
 
-		std::vector<ident_st> getInodesAboveLimit();
+		int get(const uint64_t &id, void *data, queryType type);
 
-		bool getSuperblock(mtfs::superblock_t &superblock);
+		int put(const uint64_t &id, const void *data, queryType type);
 
-		bool putSuperblock(superblock_t &superblock);
-
-		int add(uint64_t &id, const Acces::queryType type);
-
-		int add(std::vector<uint64_t> &ids, const int nb, const Acces::queryType type);
-
-		int del(const uint64_t &id, const Acces::queryType type);
-
-		int get(const uint64_t &id, void *data, Acces::queryType type);
-
-		int put(const uint64_t &id, const void *data, Acces::queryType type);
-
-
+		void accept(class Visitor *v);
 	private:
 
-		bool uptadeLastAcces(uint64_t id, std::map<uint64_t, std::vector<uint64_t>> map);
+		bool updateLastAccess(const uint64_t &id, const queryType type);
 	};
 
 }  // namespace mtfs

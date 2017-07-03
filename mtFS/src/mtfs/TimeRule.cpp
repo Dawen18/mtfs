@@ -57,4 +57,5 @@ namespace mtfs {
 	uint64_t TimeRule::now() {
 		return (uint64_t) time(NULL);
 	}
+
 }  // namespace mtfs

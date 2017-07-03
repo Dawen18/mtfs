@@ -40,9 +40,9 @@ namespace mtfs {
 
 		void addDenyGid(gid_t gid);
 
-		bool satisfyRules(ruleInfo_st info) override;
-
 		bool toJson(rapidjson::Value &json, rapidjson::Document::AllocatorType &allocator) override;
+
+		bool satisfyRules(ruleInfo_st info) override;
 
 	};
 

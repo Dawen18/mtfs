@@ -37,8 +37,13 @@
 #define BI_ACCESS "lastAccess"
 
 namespace mtfs {
-
 	class Rule;
+
+	enum queryType{
+		INODE,
+		DIR_BLOCK,
+		DATA_BLOCK,
+	};
 
 	typedef struct ident_st {
 		std::uint32_t poolId;

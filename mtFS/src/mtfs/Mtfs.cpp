@@ -333,7 +333,7 @@ namespace mtfs {
 
 		pool upThPool(this->SIMULT_UP);
 		for (auto &&id: inInode->idents) {
-			upThPool.schedule(bind(&Acces::put, this->inodes, id, &inInode->inode, Acces::INODE));
+			upThPool.schedule(bind(&Acces::put, this->inodes, id, &inInode->inode, queryType::INODE));
 		}
 	}
 
@@ -398,7 +398,7 @@ namespace mtfs {
 		}
 
 		do {
-			ret = this->inodes->get(inodeIds.back(), &inode->inode, Acces::INODE);
+			ret = this->inodes->get(inodeIds.back(), &inode->inode, queryType::INODE);
 			inodeIds.pop_back();
 			if (inodeIds.empty())
 				break;
@@ -564,7 +564,7 @@ namespace mtfs {
 //		if (!inode->inode.dataBlocks.empty()) {
 //			uint8_t *firstBlock = (uint8_t *) malloc(this->blockSize * sizeof(uint8_t));
 //
-//			this->blocks->get(inode->inode.dataBlocks.front().front(), &firstBlock, Acces::DATA_BLOCK);
+//			this->blocks->get(inode->inode.dataBlocks.front().front(), &firstBlock, queryType::DATA_BLOCK);
 //			fi->fh = (uint64_t) firstBlock;
 //		} else
 //			fi->fh = 0;A
@@ -678,7 +678,7 @@ namespace mtfs {
 			vector<ident_t> blockIdents;
 			if (0 == inode->inode.dataBlocks.size() || inode->inode.dataBlocks.size() <= blockToWrite) {
 				if (SUCCESS !=
-					(ret = this->blocks->add(newBlockInfo, blockIdents, Acces::DATA_BLOCK,
+					(ret = this->blocks->add(newBlockInfo, blockIdents, queryType::DATA_BLOCK,
 											 (const int) this->redundancy))) {
 					fuse_reply_err(req, ret);
 					return;
@@ -689,7 +689,7 @@ namespace mtfs {
 				blockIdents = inode->inode.dataBlocks[blockToWrite];
 
 				for (auto &&id: blockIdents) {
-					ret = this->blocks->get(id, block, Acces::DATA_BLOCK);
+					ret = this->blocks->get(id, block, queryType::DATA_BLOCK);
 					if (SUCCESS == ret)
 						break;
 				}
@@ -705,9 +705,7 @@ namespace mtfs {
 			rem -= endPos;
 
 			for (auto &&id: blockIdents) {
-				if (id.poolId != 1 || id.poolId != 2)
-					throw out_of_range("pool id invalide");
-				fd->blkDl.dlThPool->schedule(bind(&Acces::put, this->blocks, id, block, Acces::DATA_BLOCK));
+				fd->blkDl.dlThPool->schedule(bind(&Acces::put, this->blocks, id, block, queryType::DATA_BLOCK));
 			}
 
 			toFree.push_back((uint64_t) block);
@@ -732,7 +730,7 @@ namespace mtfs {
 		}
 
 		for (auto &&id: inode->idents) {
-			fd->inoDl.dlThPool->schedule(bind(&Acces::put, this->inodes, id, &inode->inode, Acces::INODE));
+			fd->inoDl.dlThPool->schedule(bind(&Acces::put, this->inodes, id, &inode->inode, queryType::INODE));
 		}
 
 		fd->blkDl.dlThPool->wait();
@@ -742,7 +740,7 @@ namespace mtfs {
 
 		pool delPool(this->redundancy);
 		for (auto &&id: toDel) {
-			delPool.schedule(bind(&Acces::del, this->blocks, id, Acces::DATA_BLOCK));
+			delPool.schedule(bind(&Acces::del, this->blocks, id, queryType::DATA_BLOCK));
 		}
 
 		for (auto &&ptr: toFree) {
@@ -767,7 +765,7 @@ namespace mtfs {
 
 		for (int blockToRead = firstBlock; blockToRead <= lastBlock; blockToRead++) {
 			uint8_t block[this->blockSize];
-			if (SUCCESS != this->blocks->get(inode->inode.dataBlocks[blockToRead][0], block, Acces::DATA_BLOCK)) {
+			if (SUCCESS != this->blocks->get(inode->inode.dataBlocks[blockToRead][0], block, queryType::DATA_BLOCK)) {
 				delete[]buf;
 				fuse_reply_err(req, EAGAIN);
 
@@ -936,7 +934,7 @@ namespace mtfs {
 //		if directory is empty add one block
 		if (parentInode->inode.dataBlocks.size() == 0) {
 			if (0 !=
-				(ret = this->dirBlocks->add(getRuleInfo(parentInode->inode), blockIdents, Acces::DIR_BLOCK,
+				(ret = this->dirBlocks->add(getRuleInfo(parentInode->inode), blockIdents, queryType::DIR_BLOCK,
 											this->redundancy))) {
 				return ret;
 			}
@@ -946,7 +944,7 @@ namespace mtfs {
 			parentInode->inode.atime = this->now();
 			parentInode->inode.dataBlocks.push_back(blockIdents);
 			for (auto &&ident: parentInode->idents) {
-				iPool.schedule(bind(&Acces::put, this->inodes, ident, &parentInode->inode, Acces::INODE));
+				iPool.schedule(bind(&Acces::put, this->inodes, ident, &parentInode->inode, queryType::INODE));
 			}
 			if (parentInode == this->rootIn)
 				this->writeRootInode();
@@ -956,7 +954,7 @@ namespace mtfs {
 			blockIdents = parentInode->inode.dataBlocks.back();
 
 			for (int i = 0; i < blockIdents.size(); ++i) {
-				if (0 == (ret = this->dirBlocks->get(blockIdents[i], &dirBlock, Acces::DIR_BLOCK)))
+				if (0 == (ret = this->dirBlocks->get(blockIdents[i], &dirBlock, queryType::DIR_BLOCK)))
 					break;
 			}
 
@@ -969,7 +967,7 @@ namespace mtfs {
 		if (this->maxEntryPerBlock == dirBlock.entries.size()) {
 			ruleInfo_t info = getRuleInfo(parentInode->inode);
 			info.lastAccess = this->now();
-			if (0 != (ret = this->dirBlocks->add(info, blockIdents, Acces::DIR_BLOCK, this->redundancy))) {
+			if (0 != (ret = this->dirBlocks->add(info, blockIdents, queryType::DIR_BLOCK, this->redundancy))) {
 				return ret;
 			}
 
@@ -978,7 +976,7 @@ namespace mtfs {
 			parentInode->inode.atime = this->now();
 			parentInode->inode.dataBlocks.push_back(blockIdents);
 			for (auto &&ident: parentInode->idents) {
-				iPool.schedule(bind(&Acces::put, this->inodes, ident, &parentInode->inode, Acces::INODE));
+				iPool.schedule(bind(&Acces::put, this->inodes, ident, &parentInode->inode, queryType::INODE));
 			}
 			if (parentInode == this->rootIn)
 				this->writeRootInode();
@@ -990,7 +988,7 @@ namespace mtfs {
 		pool wpool(blockIdents.size());
 		for (auto &&ident: blockIdents) {
 //			TODO try again if block not write.
-			wpool.schedule(bind(&Acces::put, this->dirBlocks, ident, &dirBlock, Acces::DIR_BLOCK));
+			wpool.schedule(bind(&Acces::put, this->dirBlocks, ident, &dirBlock, queryType::DIR_BLOCK));
 		}
 
 		return 0;
@@ -1010,7 +1008,7 @@ namespace mtfs {
 		int ret;
 
 //		get new inode idents
-		if (0 != (ret = this->inodes->add(this->getRuleInfo(inode), idents, Acces::INODE, this->redundancy))) {
+		if (0 != (ret = this->inodes->add(this->getRuleInfo(inode), idents, queryType::INODE, this->redundancy))) {
 			return ret;
 		}
 
@@ -1018,7 +1016,7 @@ namespace mtfs {
 		{
 			pool thPool(idents.size());
 			for (auto &&ident: idents) {
-				thPool.schedule(bind(&Acces::put, this->inodes, ident, &inode, Acces::INODE));
+				thPool.schedule(bind(&Acces::put, this->inodes, ident, &inode, queryType::INODE));
 			}
 		}
 
@@ -1076,7 +1074,7 @@ namespace mtfs {
 		dirBlock_t db = dirBlock_t();
 
 		for (auto &&id: ids) {
-			ret = this->dirBlocks->get(id, &db, Acces::DIR_BLOCK);
+			ret = this->dirBlocks->get(id, &db, queryType::DIR_BLOCK);
 			if (SUCCESS == ret)
 				break;
 		}
@@ -1141,7 +1139,7 @@ namespace mtfs {
 		inode_t in = inode_t();
 
 		for (auto &&id: ids) {
-			ret = this->inodes->get(id, &in, Acces::INODE);
+			ret = this->inodes->get(id, &in, queryType::INODE);
 			if (SUCCESS == ret)
 				break;
 		}

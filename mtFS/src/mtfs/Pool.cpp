@@ -86,10 +86,11 @@ namespace mtfs {
 		this->volumes[volumeId] = volume;
 		this->rules[volumeId] = rule;
 
+
 		return 0;
 	}
 
-	int Pool::add(const ruleInfo_t &info, std::vector<ident_t> &idents, const Acces::queryType type, const int nb) {
+	int Pool::add(const ruleInfo_t &info, std::vector<ident_t> &idents, const queryType type, const int nb) {
 		int ret;
 		vector<uint32_t> volumeIds;
 		if (0 != (ret = this->getValidVolumes(info, volumeIds))) {
@@ -131,16 +132,25 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Pool::del(const uint32_t &volumeId, const uint64_t &id, const Acces::queryType type) {
+	int Pool::del(const uint32_t &volumeId, const uint64_t &id, const queryType type) {
 		return this->volumes[volumeId]->del(id, type);
 	}
 
-	int Pool::get(const uint32_t &volumeId, const uint64_t &id, void *data, const Acces::queryType type) {
+	int Pool::get(const uint32_t &volumeId, const uint64_t &id, void *data, const queryType type) {
 		return this->volumes[volumeId]->get(id, data, type);
 	}
 
-	int Pool::put(const uint32_t &volumeId, const uint64_t &id, const void *data, const Acces::queryType type) {
+	int Pool::put(const uint32_t &volumeId, const uint64_t &id, const void *data, const queryType type) {
 		return this->volumes[volumeId]->put(id, data, type);
+	}
+
+	/**
+	 * Visitor function.
+	 *
+	 * @param v The visitor.
+	 */
+	void Pool::accept(Visitor *v) {
+		v->visit(this);
 	}
 
 	int Pool::getValidVolumes(const ruleInfo_t &info, vector<uint32_t> &volumeIds) {

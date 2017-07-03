@@ -1,6 +1,4 @@
-#include <mtfs/Mtfs.h>
-#include <mtfs/structs.h>
-#include "mtfs/PoolManager.h"
+#include <mtfs/PoolManager.h>
 
 namespace mtfs {
 	using namespace std;
@@ -25,7 +23,7 @@ namespace mtfs {
 		return SUCCESS;
 	}
 
-	int PoolManager::add(const ruleInfo_t &info, std::vector<ident_t> &ids, const Acces::queryType type,
+	int PoolManager::add(const ruleInfo_t &info, std::vector<ident_t> &ids, const queryType type,
 						 const size_t nb) {
 		int ret;
 		vector<uint32_t> poolIds;
@@ -69,19 +67,48 @@ namespace mtfs {
 		return ret;
 	}
 
-	int PoolManager::del(const ident_t &id, const Acces::queryType type) {
-		return this->pools[id.poolId]->del(id.volumeId, id.id, type);
+	int PoolManager::del(const ident_t &id, const queryType type) {
+		int ret = IS_LOCKED;
+
+		ident_t newId = id;
+		this->hasMoved(id, newId, type);
+
+		if (!this->isLocked(newId, type))
+			ret = this->pools[newId.poolId]->del(newId.volumeId, newId.id, type);
+
+		return ret;
 	}
 
-	int PoolManager::get(const ident_t &id, void *data, const Acces::queryType type) {
-		return this->pools[id.poolId]->get(id.volumeId, id.id, data, type);
+	int PoolManager::get(const ident_t &id, void *data, const queryType type) {
+		int ret = IS_LOCKED;
+
+		ident_t newId = id;
+		this->hasMoved(id, newId, type);
+
+		if (!this->isLocked(newId, type))
+			ret = this->pools[newId.poolId]->get(newId.volumeId, newId.id, data, type);
+
+		return ret;
 	}
 
-	int PoolManager::put(const ident_t &id, const void *data, const Acces::queryType type) {
-		return this->pools[id.poolId]->put(id.volumeId, id.id, data, type);
+	int PoolManager::put(const ident_t &id, const void *data, const queryType type) {
+		int ret = IS_LOCKED;
+
+		ident_t newId = id;
+		this->hasMoved(id, newId, type);
+
+		if (this->pools.end() == this->pools.find(newId.poolId))
+			throw out_of_range("Invalid pool id " + newId.poolId);
+
+		if (this->lock(newId, type)) {
+			ret = this->pools[newId.poolId]->put(newId.volumeId, newId.id, data, type);
+			this->unlock(newId, type);
+		}
+
+		return ret;
 	}
 
-	bool PoolManager::isLocked(const ident_t &id, const PoolManager::queryType &type) {
+	bool PoolManager::isLocked(const ident_t &id, const queryType &type) {
 		mutex *mu = nullptr;
 		set<ident_t> *lSet = nullptr;
 
@@ -107,7 +134,7 @@ namespace mtfs {
 		return lSet->find(id) != lSet->end();
 	}
 
-	bool PoolManager::lock(const ident_t &id, const PoolManager::queryType &type) {
+	bool PoolManager::lock(const ident_t &id, const queryType &type) {
 		mutex *mu = nullptr;
 		set<ident_t> *lSet = nullptr;
 
@@ -124,9 +151,11 @@ namespace mtfs {
 				mu = &this->blockMutex;
 				lSet = &this->lockedBlocks;
 				break;
+			default:
+//				TODO log error
+				return false;
+				break;
 		}
-
-		assert(nullptr != mu && nullptr != lSet);
 
 		unique_lock<mutex> lk(*mu);
 		if (lSet->find(id) != lSet->end())
@@ -137,7 +166,39 @@ namespace mtfs {
 		return true;
 	}
 
-	bool PoolManager::hasMoved(const ident_t &id, ident_t &newId, const PoolManager::queryType &type) {
+	bool PoolManager::unlock(const ident_t &id, const queryType &type) {
+		mutex *mu = nullptr;
+		set<ident_t> *lSet = nullptr;
+
+		switch (type) {
+			case INODE:
+				mu = &this->inodeMutex;
+				lSet = &this->lockedInodes;
+				break;
+			case DIR_BLOCK:
+				mu = &this->dirMutex;
+				lSet = &this->lockedDirBlock;
+				break;
+			case DATA_BLOCK:
+				mu = &this->blockMutex;
+				lSet = &this->lockedBlocks;
+				break;
+			default:
+//				TODO log error
+				return false;
+				break;
+		}
+
+		unique_lock<mutex> lk(*mu);
+		if (lSet->find(id) == lSet->end())
+			return false;
+
+		lSet->erase(id);
+
+		return true;
+	}
+
+	bool PoolManager::hasMoved(const ident_t &id, ident_t &newId, const queryType &type) {
 		mutex *mu = nullptr;
 		map<ident_t, ident_t> *transMap = nullptr;
 
@@ -177,5 +238,8 @@ namespace mtfs {
 		return SUCCESS;
 	}
 
+	void PoolManager::accept(Visitor *visitor) {
+		visitor->visit(this);
+	}
 
 }  // namespace mtfs

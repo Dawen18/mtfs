@@ -7,7 +7,7 @@
 #include <iostream>
 #include <assert.h>
 
-#include "mtfs/Rule.h"
+#include <mtfs/Rule.h>
 
 namespace mtfs {
 	class TimeRule : public Rule {

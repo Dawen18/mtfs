@@ -13,7 +13,8 @@ set(FS_HEAD
 		include/mtfs/TimeRule.h
 		include/mtfs/UserRightRule.h
 		include/mtfs/Volume.h
-		)
+		include/mtfs/Visitor.h
+		include/mtfs/Migrator.h)
 
 set(FS_SRC
 		src/mtfs/Cache.cpp
@@ -23,7 +24,8 @@ set(FS_SRC
 		src/mtfs/Rule.cpp
 		src/mtfs/TimeRule.cpp
 		src/mtfs/UserRightRule.cpp
-		src/mtfs/Volume.cpp)
+		src/mtfs/Volume.cpp
+		src/mtfs/Migrator.cpp)
 
 set(MTFUSE_HEAD
 		include/mtfsFuse/FuseBase.h
@@ -39,7 +41,7 @@ set(MTFUSE_SRC
 
 set(CONF_HEAD
 		include/pluginSystem/PluginManager.h
-		src/utils/Semaphore.cpp include/utils/Semaphore.h)
+		src/utils/Semaphore.cpp include/utils/Semaphore.h src/mtfs/Migrator.cpp include/mtfs/Migrator.h)
 
 set(CONF_SRC
 		src/pluginSystem/PluginManager.cpp
@@ -50,9 +52,8 @@ set(UTILS
 		include/utils/Fs.h src/utils/Fs.cpp src/utils/Semaphore.cpp include/utils/Semaphore.h)
 
 add_executable(mtfsCreate src/mtfsCreate.cpp
-		${FS_SRC} ${CONF_SRC} ${UTILS}
-		../Plugin/BlockDevice/BlockDevice.cpp
-		)
+		${FS_SRC} ${CONF_SRC} ${UTILS})
+
 target_link_libraries(mtfsCreate fuse3 dl boost_system boost_filesystem boost_thread pthread)
 
 #link_directories(/usr/local/lib)
@@ -63,5 +64,6 @@ add_executable(mtfsMount src/mtfsMount.cpp
 		${FS_HEAD} ${FS_SRC}
 		${MTFUSE_HEAD} ${MTFUSE_SRC}
 		${UTILS}
-		../Plugin/BlockDevice/BlockDevice.cpp)
+		)
+
 target_link_libraries(mtfsMount fuse3 dl boost_system boost_filesystem boost_thread pthread)
