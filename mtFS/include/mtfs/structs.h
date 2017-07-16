@@ -7,7 +7,6 @@
 #define TRAVAIL_BACHELOR_STRUCTS_H
 
 #include <map>
-#include <mtfs/Rule.h>
 #include <rapidjson/document.h>
 
 #define IN_MODE "accessRight"
@@ -39,11 +38,23 @@
 namespace mtfs {
 	class Rule;
 
-	enum queryType{
+	enum queryType {
 		INODE,
 		DIR_BLOCK,
 		DATA_BLOCK,
 	};
+
+	typedef struct ruleInfo_st {
+		uid_t uid;
+		gid_t gid;
+		uint64_t lastAccess;
+
+		ruleInfo_st() {
+			ruleInfo_st(0, 0, 0);
+		}
+
+		ruleInfo_st(uid_t uid, gid_t gid, uint64_t atime) : uid(uid), gid(gid), lastAccess(atime) {}
+	} ruleInfo_t;
 
 	typedef struct ident_st {
 		std::uint32_t poolId;
@@ -54,12 +65,20 @@ namespace mtfs {
 																					   volumeId(vid),
 																					   poolId(pid) {}
 
+		ident_st &operator=(const ident_st &id) {
+			this->poolId = id.poolId;
+			this->volumeId = id.volumeId;
+			this->id = id.id;
+
+			return *this;
+		}
+
 		bool operator==(const ident_st &i) const {
 			return (poolId == i.poolId && volumeId == i.volumeId && id == i.id);
 		}
 
 		bool operator!=(const ident_st &i) const {
-			return (poolId != i.poolId && volumeId != i.volumeId && id != i.id);
+			return (poolId != i.poolId || volumeId != i.volumeId || id != i.id);
 		}
 
 		bool operator<(const ident_st &i) const {
@@ -277,15 +296,24 @@ namespace mtfs {
 	} superblock_t;
 
 	typedef struct blockInfo_st {
-		ident_st referenceId;
+		ident_t id;
+		std::vector<ident_t> referenceId;
 		uint64_t lastAccess;
 
 		bool operator==(const blockInfo_st &other) const {
-			if (other.referenceId != this->referenceId)
+			if (other.id != this->id)
 				return false;
+
+			if (!(other.referenceId == this->referenceId))
+				return false;
+
 
 			return (other.lastAccess == this->lastAccess);
 		}
+
+		blockInfo_st() : id(ident_t()), lastAccess(0) {
+			referenceId.clear();
+		};
 	} blockInfo_t;
 
 	typedef struct move_st {

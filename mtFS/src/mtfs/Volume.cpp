@@ -1,12 +1,17 @@
 #include <pluginSystem/PluginManager.h>
 #include <thread>
+#include <climits>
 #include <boost/thread.hpp>
 #include <boost/threadpool/pool.hpp>
 #include "mtfs/Volume.h"
+#include <mtfs/Rule.h>
 
 using namespace std;
 
 namespace mtfs {
+
+	Volume::Volume(pluginSystem::Plugin *plugin) : plugin(plugin), minDelay(0), maxDelay(0) {}
+
 	Volume::~Volume() {
 		plugin->detach();
 
@@ -74,13 +79,6 @@ namespace mtfs {
 		}
 	}
 
-	Volume::Volume(pluginSystem::Plugin *plugin) : plugin(plugin) {}
-
-	void Volume::getBlockInfo(uint64_t blockId, blockInfo_t &info) {
-	}
-
-	void Volume::setBlockInfo(uint64_t blockId, blockInfo_t &info) {
-	}
 
 	int Volume::add(uint64_t &id, const queryType type) {
 		int ret;
@@ -199,17 +197,123 @@ namespace mtfs {
 //				TODO log noimplemented
 				break;
 		}
+		this->updateLastAccess(id, type);
 
 		return ret;
 	}
 
-	void Volume::accept(Visitor *v) {
-		v->visit(this);
+	int Volume::getMetas(const uint64_t &id, blockInfo_t &metas, queryType type) {
+		switch (type) {
+			case INODE:
+				return this->plugin->getInodeMetas(id, metas);
+				break;
+			case DIR_BLOCK:
+				return this->plugin->getDirBlockMetas(id, metas);
+				break;
+			case DATA_BLOCK:
+				return this->plugin->getBlockMetas(id, metas);
+				break;
+			default:
+				return ENOSYS;
+		}
+	}
+
+	int Volume::putMetas(const uint64_t &id, const blockInfo_t &metas, queryType type) {
+		switch (type) {
+			case INODE:
+				return this->plugin->putInodeMetas(id, metas);
+				break;
+			case DIR_BLOCK:
+				return this->plugin->putDirBlockMetas(id, metas);
+				break;
+			case DATA_BLOCK:
+				return this->plugin->putBlockMetas(id, metas);
+				break;
+			default:
+				return ENOSYS;
+		}
+	}
+
+	int Volume::getUnsatisfy(vector<blockInfo_t> &unsatisfy, const queryType &type, const int limit) {
+		int nb = 0;
+		if (this->isTimeVolume) {
+			vector<uint64_t> under;
+			this->getOutOfTime(under, type);
+
+			for (auto &&blk :under) {
+				blockInfo_t info = blockInfo_t();
+//				this->getMetas(blk, info, type);
+
+				unsatisfy.push_back(info);
+
+				nb++;
+				if (limit == nb)
+					return 0;
+			}
+		}
+
+		return 0;
 	}
 
 	bool Volume::updateLastAccess(const uint64_t &id, const queryType type) {
-		return false;
+		map<uint64_t, uint64_t> *mp;
+		switch (type) {
+			case INODE:
+				mp = &this->inodesAccess;
+				break;
+			case DIR_BLOCK:
+				mp = &this->dirBlockAccess;
+				break;
+			case DATA_BLOCK:
+				mp = &this->blocksAccess;
+				break;
+			default:
+				return false;
+		}
+
+		(*mp)[id] = (uint64_t) time(NULL);
+
+		return true;
 	}
 
+	void Volume::setMinDelay(uint64_t minDelay) {
+		this->minDelay = minDelay;
+	}
+
+	void Volume::setMaxDelay(uint64_t maxDelay) {
+		this->maxDelay = maxDelay;
+	}
+
+	void Volume::setIsTimeVolume(bool b) {
+		this->isTimeVolume = b;
+	}
+
+	int Volume::getOutOfTime(vector<uint64_t> &blocks, const queryType &type) {
+		uint64_t now = (uint64_t) time(NULL);
+		const uint64_t maxTimestamp = now - this->minDelay;
+		const uint64_t minTimestamp = 0 == this->maxDelay ? 0 : now - this->maxDelay;
+
+		map<uint64_t, uint64_t> *mp;
+		switch (type) {
+			case INODE:
+				mp = &this->inodesAccess;
+				break;
+			case DIR_BLOCK:
+				mp = &this->dirBlockAccess;
+				break;
+			case DATA_BLOCK:
+				mp = &this->blocksAccess;
+				break;
+			default:
+				return ENOSYS;
+		}
+
+		for (auto &&item :*mp) {
+			if (!(maxTimestamp > item.second && minTimestamp < item.second))
+				blocks.push_back(item.first);
+		}
+
+		return 0;
+	}
 
 }  // namespace mtfs

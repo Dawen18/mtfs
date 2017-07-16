@@ -19,7 +19,9 @@ namespace pluginSystem {
 		static constexpr const char *BLOCKS_DIR = "blocks";
 		static constexpr const char *DIR_BLOCKS_DIR = "dirBlocks";
 		static constexpr const char *METAS_DIR = "metas";
-		static constexpr const char *BLOCK_METAS_DIR = "metas/block";
+		static constexpr const char *INODE_METAS_DIR = "metas/inodes";
+		static constexpr const char *DIR_BLOCK_METAS_DIR = "metas/dirBlocks";
+		static constexpr const char *BLOCK_METAS_DIR = "metas/blocks";
 
 		static const int SUCCESS = 0;
 
@@ -40,6 +42,10 @@ namespace pluginSystem {
 
 		int putInode(const uint64_t &inodeId, const mtfs::inode_st &inode) override;
 
+		int getInodeMetas(const uint64_t &inodeId, mtfs::blockInfo_t &metas) override;
+
+		int putInodeMetas(const uint64_t &inodeId, const mtfs::blockInfo_t &metas) override;
+
 		int addDirBlock(uint64_t *id) override;
 
 		int delDirBlock(const uint64_t &id) override;
@@ -47,6 +53,10 @@ namespace pluginSystem {
 		int getDirBlock(const uint64_t &id, mtfs::dirBlock_t &block) override;
 
 		int putDirBlock(const uint64_t &id, const mtfs::dirBlock_t &block) override;
+
+		int getDirBlockMetas(const uint64_t &id, mtfs::blockInfo_t &metas) override;
+
+		int putDirBlockMetas(const uint64_t &id, const mtfs::blockInfo_t &metas) override;
 
 		int addBlock(uint64_t *blockId) override;
 
@@ -56,9 +66,9 @@ namespace pluginSystem {
 
 		int putBlock(const uint64_t &blockId, const uint8_t *buffer) override;
 
-		bool getBlockMetas(const uint64_t &blockId, mtfs::blockInfo_t &metas) override;
+		int getBlockMetas(const uint64_t &blockId, mtfs::blockInfo_t &metas) override;
 
-		bool putBlockMetas(const uint64_t &blockId, const mtfs::blockInfo_t &metas) override;
+		int putBlockMetas(const uint64_t &blockId, const mtfs::blockInfo_t &metas) override;
 
 		bool getSuperblock(mtfs::superblock_t &superblock) override;
 
@@ -102,6 +112,10 @@ namespace pluginSystem {
 		int createFile(std::string path);
 
 		int deleteFile(std::string path);
+
+		int getMetas(const std::string &filename, mtfs::blockInfo_t &infos);
+
+		int putMetas(const std::string &filename, const mtfs::blockInfo_t &infos);
 
 	};
 

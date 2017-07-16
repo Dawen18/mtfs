@@ -13,7 +13,6 @@ set(FS_HEAD
 		include/mtfs/TimeRule.h
 		include/mtfs/UserRightRule.h
 		include/mtfs/Volume.h
-		include/mtfs/Visitor.h
 		include/mtfs/Migrator.h)
 
 set(FS_SRC
@@ -49,7 +48,13 @@ set(CONF_SRC
 
 set(UTILS
 		include/utils/ThreadQueue.h
-		include/utils/Fs.h src/utils/Fs.cpp src/utils/Semaphore.cpp include/utils/Semaphore.h)
+		include/utils/Fs.h
+		src/utils/Fs.cpp
+		src/utils/Semaphore.cpp
+		include/utils/Semaphore.h
+		src/utils/Logger.cpp
+		include/utils/Logger.h
+		)
 
 add_executable(mtfsCreate src/mtfsCreate.cpp
 		${FS_SRC} ${CONF_SRC} ${UTILS})

@@ -8,6 +8,7 @@
 #include <boost/filesystem.hpp>
 #include <grp.h>
 #include <pwd.h>
+#include <mtfs/structs.h>
 
 #define HOME "/home/david/Cours/4eme/Travail_bachelor/Home/"
 #define SYSTEMS_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Systems/"
@@ -255,7 +256,7 @@ namespace mtfs {
 
 		assert(d.HasMember(ROOT_INODES) && d[ROOT_INODES].IsArray());
 		for (auto &&ident: d[ROOT_INODES].GetArray()) {
-			ident_t id;
+			ident_t id = ident_t();
 			id.fromJson(ident);
 			sb.rootInodes.push_back(id);
 		}
@@ -273,6 +274,10 @@ namespace mtfs {
 		(void) userdata, conn;
 
 		getInstance()->readRootInode();
+
+		this->migratorInfo.poolManager = (PoolManager *) this->blocks;
+
+		this->migratorThr = std::thread(Migrator::main, &this->migratorInfo);
 
 #ifdef DEBUG
 		cerr << "[MTFS]: End init" << endl;
@@ -292,6 +297,13 @@ namespace mtfs {
 //			delete this->dirBlocks;
 
 		delete this->blocks;
+
+		unique_lock<mutex> lk(*this->migratorInfo.endMutex);
+		this->migratorInfo.end = true;
+		lk.unlock();
+		this->migratorInfo.condV.notify_all();
+
+		this->migratorThr.join();
 	}
 
 	void Mtfs::getAttr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
@@ -443,6 +455,9 @@ namespace mtfs {
 			return;
 		}
 
+		pool mPool(SIMULT_UP);
+		this->initMetas(*parentInode, inodeIdents, queryType::DIR_BLOCK, &mPool);
+
 //			Add entry in dir
 		if (0 != (ret = this->addEntry(parentInode, name, inodeIdents))) {
 			delete inode;
@@ -473,6 +488,9 @@ namespace mtfs {
 			return;
 		}
 
+		pool mPool(SIMULT_UP);
+		this->initMetas(*parentInode, inodeIdents, queryType::DIR_BLOCK, &mPool);
+
 //			Add entry in dir
 		if (0 != (ret = this->addEntry(parentInode, name, inodeIdents))) {
 			delete inode;
@@ -487,6 +505,22 @@ namespace mtfs {
 		this->buildParam(*inode, param);
 
 		fuse_reply_entry(req, &param);
+	}
+
+	void Mtfs::unlink(fuse_req_t req, fuse_ino_t parent, const char *name) {
+		internalInode_st *parentInode = this->getIntInode(parent);
+
+		int ret;
+		if (SUCCESS != (ret = this->doUnlink(parentInode, name)))
+			fuse_reply_err(req, ret);
+		else
+			fuse_reply_err(req, SUCCESS);
+	}
+
+	void Mtfs::rmdir(fuse_req_t req, fuse_ino_t parent, const char *name) {
+		(void) parent, name;
+
+		fuse_reply_err(req, ENOSYS);
 	}
 
 	void Mtfs::access(fuse_req_t req, fuse_ino_t ino, int mask) {
@@ -669,6 +703,8 @@ namespace mtfs {
 		size_t rem = size;
 		size_t write = 0;
 
+		pool metasTp(SIMULT_UP);
+
 		vector<uint64_t> toFree;
 
 		for (int blockToWrite = firstBlock; blockToWrite <= lastBlock; ++blockToWrite) {
@@ -683,6 +719,8 @@ namespace mtfs {
 					fuse_reply_err(req, ret);
 					return;
 				}
+
+				this->initMetas(*inode, blockIdents, queryType::DATA_BLOCK, &metasTp);
 
 				inode->inode.dataBlocks.push_back(blockIdents);
 			} else {
@@ -873,7 +911,7 @@ namespace mtfs {
 		for (auto &&item: d[IN_BLOCKS].GetArray()) {
 			vector<ident_t> blocksRedundancy;
 			for (auto &&block: item.GetArray()) {
-				ident_t ident;
+				ident_t ident = ident_t();
 
 				assert(block.HasMember(ID_POOL));
 				ident.poolId = block[ID_POOL].GetUint();
@@ -930,6 +968,7 @@ namespace mtfs {
 		vector<ident_t> blockIdents;
 
 		pool iPool(parentInode->idents.size());
+		pool mPool(SIMULT_UP);
 
 //		if directory is empty add one block
 		if (parentInode->inode.dataBlocks.size() == 0) {
@@ -940,6 +979,8 @@ namespace mtfs {
 			}
 
 			dirBlock.entries.clear();
+
+			this->initMetas(*parentInode, blockIdents, queryType::DIR_BLOCK, &mPool);
 
 			parentInode->inode.atime = this->now();
 			parentInode->inode.dataBlocks.push_back(blockIdents);
@@ -970,6 +1011,8 @@ namespace mtfs {
 			if (0 != (ret = this->dirBlocks->add(info, blockIdents, queryType::DIR_BLOCK, this->redundancy))) {
 				return ret;
 			}
+
+			this->initMetas(*parentInode, blockIdents, queryType::DIR_BLOCK, &mPool);
 
 			dirBlock.entries.clear();
 
@@ -1300,6 +1343,78 @@ namespace mtfs {
 
 	uint64_t Mtfs::now() {
 		return (uint64_t) time(NULL);
+	}
+
+	void Mtfs::initMetas(const internalInode_st &parentInode, const std::vector<ident_t> ids, const queryType type,
+						 boost::threadpool::pool *thPool) {
+		blockInfo_t metas = blockInfo_t();
+		metas.lastAccess = (uint64_t) time(NULL);
+		metas.referenceId = parentInode.idents;
+
+//		for (auto &&id :ids) {
+//			switch (type) {
+//				case INODE:
+//					if (nullptr != thPool)
+//						thPool->schedule(bind(&Acces::putMetas, this->inodes, id, metas, type));
+//					else
+//						this->inodes->putMetas(id, metas, type);
+//					break;
+//				case DIR_BLOCK:
+//					if (nullptr != thPool)
+//						thPool->schedule(bind(&Acces::putMetas, this->dirBlocks, id, metas, type));
+//					else
+//						this->dirBlocks->putMetas(id, metas, type);
+//					break;
+//				case DATA_BLOCK:
+//					if (nullptr != thPool)
+//						thPool->schedule(bind(&Acces::putMetas, this->blocks, id, metas, type));
+//					else
+//						this->blocks->putMetas(id, metas, type);
+//					break;
+//			}
+//		}
+	}
+
+	int Mtfs::doUnlink(internalInode_st *parent, const std::string name) {
+
+		for (auto &&dBlkIds :parent->inode.dataBlocks) {
+			dirBlock_t dBlk = dirBlock_t();
+
+			this->dirBlocks->get(dBlkIds.front(), &dBlk, queryType::DIR_BLOCK);
+
+			if (dBlk.entries.end() != dBlk.entries.find(name))
+				return this->delEntry(dBlkIds, dBlk, name);
+		}
+		return ENOENT;
+	}
+
+	int Mtfs::delEntry(std::vector<ident_t> &ids, dirBlock_t &blk, const std::string &name) {
+		vector<ident_t> inodeIds = blk.entries.find(name)->second;
+
+		inode_t inode = inode_t();
+		this->inodes->get(inodeIds.front(), &inode, queryType::INODE);
+
+		if (0 < (inode.accesRight & S_IFDIR))
+			return EISDIR;
+
+		blk.entries.erase(name);
+		pool upPool(SIMULT_UP);
+
+		for (auto &&id :ids) {
+			upPool.schedule(bind(&Acces::put, this->dirBlocks, id, &blk, queryType::DIR_BLOCK));
+		}
+
+		for (auto &&dataBlkIds :inode.dataBlocks) {
+			for (auto &&blkId :dataBlkIds) {
+				this->blocks->del(blkId, queryType::DATA_BLOCK);
+			}
+		}
+
+		for (auto &&inodeId :inodeIds) {
+			this->inodes->del(inodeId, queryType::INODE);
+		}
+
+		return 0;
 	}
 
 

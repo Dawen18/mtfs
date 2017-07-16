@@ -2,7 +2,6 @@
  * @author David Wittwer
  * @date 30.04.17.
 **/
-#define FUSE_USE_VERSION 30
 #define HOME_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/"
 #define PLUGIN_HOME "/home/david/Cours/4eme/Travail_bachelor/Home/Plugins/"
 #define CONF_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Configs/"
@@ -242,6 +241,13 @@ int main(int argc, char **argv) {
 			if (tmpDoc.HasMember(Rule::MIGRATION))
 				pool.migration = tmpDoc[Rule::MIGRATION].GetInt();
 
+			if (tmpDoc.HasMember(TimeRule::TIME_LOW_LIMIT)) {
+				tmpDoc[TimeRule::TIME_LOW_LIMIT].SetUint(tmpDoc[TimeRule::TIME_LOW_LIMIT].GetUint() * 60);
+			}
+
+			if (tmpDoc.HasMember(TimeRule::TIME_HIGH_LIMIT))
+				tmpDoc[TimeRule::TIME_HIGH_LIMIT].SetUint(tmpDoc[TimeRule::TIME_HIGH_LIMIT].GetUint() * 60);
+
 			pool.rule = Rule::buildRule(superblock.migration, tmpDoc);
 		} else {
 			cerr << "config needed!" << endl;
@@ -291,6 +297,14 @@ int main(int argc, char **argv) {
 					volume.params.insert(make_pair(param.name.GetString(), param.value.GetString()));
 				}
 			}
+
+			if (tmpDoc.HasMember(TimeRule::TIME_LOW_LIMIT)) {
+				tmpDoc[TimeRule::TIME_LOW_LIMIT].SetUint(tmpDoc[TimeRule::TIME_LOW_LIMIT].GetUint() * 60);
+			}
+
+			if (tmpDoc.HasMember(TimeRule::TIME_HIGH_LIMIT))
+				tmpDoc[TimeRule::TIME_HIGH_LIMIT].SetUint(tmpDoc[TimeRule::TIME_HIGH_LIMIT].GetUint() * 60);
+
 
 			volume.rule = Rule::buildRule(pool->migration, tmpDoc);
 		} else {
@@ -442,7 +456,7 @@ uint32_t findMissing(std::vector<uint32_t> &x, uint32_t number) {
 void installConfig(superblock_t &superblock, string name) {
 //	create ident for rootInode.
 	superblock.rootInodes.clear();
-	const int rootRedundancy = max(3, superblock.redundancy);
+	const int rootRedundancy = max(3, (int) superblock.redundancy);
 	int i = 0;
 	for (auto &&pool: superblock.pools) {
 		for (auto &&volume: pool.second.volumes) {

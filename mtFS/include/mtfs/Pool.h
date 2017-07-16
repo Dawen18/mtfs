@@ -4,15 +4,13 @@
 #include <string>
 #include <vector>
 #include <mtfs/structs.h>
-#include <mtfs/Volume.h>
+//#include <mtfs/Volume.h>
 #include <mtfs/Rule.h>
-#include "Visitor.h"
 
 namespace mtfs {
 	class Volume;
 
 	class Pool {
-		friend class Migrator;
 
 	public:
 		static constexpr const char *POOLS = "pools";
@@ -22,6 +20,8 @@ namespace mtfs {
 		static const int VOLUME_ID_EXIST = 1;
 		static const int NO_VALID_VOLUME = 2;
 
+
+		void doMigration();
 
 	private:
 
@@ -50,7 +50,9 @@ namespace mtfs {
 
 		int put(const uint32_t &volumeId, const uint64_t &id, const void *data, const queryType type);
 
-		void accept(class Visitor *v);
+		int getMetas(const uint32_t &volumeId, const uint64_t &id, blockInfo_t &metas, const queryType type);
+
+		int putMetas(const uint32_t &volumeId, const uint64_t &id, const blockInfo_t &metas, const queryType type);
 
 	private:
 

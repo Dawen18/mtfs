@@ -258,26 +258,43 @@ TEST_F(BlockDeviceFixture, superblock) {
 
 TEST_F(BlockDeviceFixture, putMetas) {
 	mtfs::blockInfo_t blockInfo;
-	blockInfo.referenceId.poolId = 1;
-	blockInfo.referenceId.volumeId = 1;
-	blockInfo.referenceId.id = 1;
+
+	mtfs::ident_t ident1(1, 1, 1);
+	mtfs::ident_t ident2(2, 2, 2);
+
+	blockInfo.referenceId.push_back(ident1);
+	blockInfo.referenceId.push_back(ident2);
 	blockInfo.lastAccess = (uint64_t) time(NULL);
 
-	ASSERT_TRUE(blockDevice.putBlockMetas(1, blockInfo));
+	ASSERT_EQ(0, blockDevice.putInodeMetas(1, blockInfo));
+	ASSERT_EQ(0, blockDevice.putDirBlockMetas(1, blockInfo));
+	ASSERT_EQ(0, blockDevice.putBlockMetas(1, blockInfo));
 }
 
 TEST_F(BlockDeviceFixture, getMetas) {
-	mtfs::blockInfo_t blockInfo, receiveInfo;
-	memset(&blockInfo, 0, sizeof(mtfs::blockInfo_t));
-	memset(&receiveInfo, 0, sizeof(mtfs::blockInfo_t));
+	mtfs::blockInfo_t blockInfo = mtfs::blockInfo_t(), receiveInfo = mtfs::blockInfo_t();
+//	memset(&blockInfo, 0, sizeof(mtfs::blockInfo_t));
+//	memset(&receiveInfo, 0, sizeof(mtfs::blockInfo_t));
 
-	blockInfo.referenceId.poolId = 1;
-	blockInfo.referenceId.volumeId = 1;
-	blockInfo.referenceId.id = 2;
+	mtfs::ident_t ident1(1, 1, 1);
+	mtfs::ident_t ident2(2, 2, 2);
+
+	blockInfo.referenceId.push_back(ident1);
+	blockInfo.referenceId.push_back(ident2);
 	blockInfo.lastAccess = (uint64_t) time(NULL);
 
-	ASSERT_TRUE(blockDevice.putBlockMetas(2, blockInfo));
-	ASSERT_TRUE(blockDevice.getBlockMetas(2, receiveInfo));
+	ASSERT_EQ(0, blockDevice.putInodeMetas(2, blockInfo));
+	ASSERT_EQ(0, blockDevice.getInodeMetas(2, receiveInfo));
+	ASSERT_EQ(blockInfo, receiveInfo);
+
+	receiveInfo = mtfs::blockInfo_t();
+	ASSERT_EQ(0, blockDevice.putDirBlockMetas(2, blockInfo));
+	ASSERT_EQ(0, blockDevice.getDirBlockMetas(2, receiveInfo));
+	ASSERT_EQ(blockInfo, receiveInfo);
+
+	receiveInfo = mtfs::blockInfo_t();
+	ASSERT_EQ(0, blockDevice.putBlockMetas(2, blockInfo));
+	ASSERT_EQ(0, blockDevice.getBlockMetas(2, receiveInfo));
 	ASSERT_EQ(blockInfo, receiveInfo);
 }
 

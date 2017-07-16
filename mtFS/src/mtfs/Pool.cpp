@@ -1,3 +1,4 @@
+#include <utils/Logger.h>
 #include "mtfs/Pool.h"
 
 using namespace std;
@@ -86,6 +87,7 @@ namespace mtfs {
 		this->volumes[volumeId] = volume;
 		this->rules[volumeId] = rule;
 
+		rule->configureStorage(volume);
 
 		return 0;
 	}
@@ -144,13 +146,12 @@ namespace mtfs {
 		return this->volumes[volumeId]->put(id, data, type);
 	}
 
-	/**
-	 * Visitor function.
-	 *
-	 * @param v The visitor.
-	 */
-	void Pool::accept(Visitor *v) {
-		v->visit(this);
+	int Pool::getMetas(const uint32_t &volumeId, const uint64_t &id, blockInfo_t &metas, const queryType type) {
+		return this->volumes[volumeId]->getMetas(id, metas, type);
+	}
+
+	int Pool::putMetas(const uint32_t &volumeId, const uint64_t &id, const blockInfo_t &metas, const queryType type) {
+		return this->volumes[volumeId]->putMetas(id, metas, type);
 	}
 
 	int Pool::getValidVolumes(const ruleInfo_t &info, vector<uint32_t> &volumeIds) {
@@ -159,6 +160,25 @@ namespace mtfs {
 				volumeIds.push_back(item.first);
 		}
 		return 0;
+	}
+
+	void Pool::doMigration() {
+		for (auto &&volume :this->volumes) {
+			Logger::getInstance()->log("Pool.doMigration", "do migration for volume: " + to_string(volume.first),
+									   Logger::L_DEBUG);
+			vector<blockInfo_t> unsatisfy;
+			unsatisfy.clear();
+			volume.second->getUnsatisfy(unsatisfy, DATA_BLOCK);
+
+			for (auto &&blk :unsatisfy) {
+				blk.id.volumeId = volume.first;
+			}
+
+			unsigned long nb = unsatisfy.size();
+
+			if (0 != nb)
+				Logger::getInstance()->log("Pool.doMigration", "Block need to move: " + to_string(nb), Logger::L_DEBUG);
+		}
 	}
 
 

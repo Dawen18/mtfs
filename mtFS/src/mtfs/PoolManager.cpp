@@ -108,6 +108,41 @@ namespace mtfs {
 		return ret;
 	}
 
+	int PoolManager::getMetas(const ident_t &id, blockInfo_t &metas, const queryType type) {
+		int ret = IS_LOCKED;
+
+		ident_t newId = id;
+		this->hasMoved(id, newId, type);
+
+		if (!this->isLocked(newId, type))
+			ret = this->pools[newId.poolId]->getMetas(newId.volumeId, newId.id, metas, type);
+
+		return ret;
+	}
+
+	int PoolManager::putMetas(const ident_t &id, const blockInfo_t &metas, const queryType type) {
+		int ret = IS_LOCKED;
+
+		ident_t newId = id;
+		this->hasMoved(id, newId, type);
+
+		if (this->pools.end() == this->pools.find(newId.poolId))
+			throw out_of_range("Invalid pool id " + newId.poolId);
+
+		if (this->lock(newId, type)) {
+			ret = this->pools[newId.poolId]->putMetas(newId.volumeId, newId.id, metas, type);
+			this->unlock(newId, type);
+		}
+
+		return ret;
+	}
+
+	void PoolManager::doMigration() {
+		for (auto &&pool: this->pools) {
+			pool.second->doMigration();
+		}
+	}
+
 	bool PoolManager::isLocked(const ident_t &id, const queryType &type) {
 		mutex *mu = nullptr;
 		set<ident_t> *lSet = nullptr;
@@ -238,8 +273,5 @@ namespace mtfs {
 		return SUCCESS;
 	}
 
-	void PoolManager::accept(Visitor *visitor) {
-		visitor->visit(this);
-	}
 
 }  // namespace mtfs

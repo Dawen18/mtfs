@@ -75,4 +75,17 @@ namespace mtfs {
 		}
 		return rule;
 	}
+
+	int Rule::configureStorage(Volume *volume) {
+		volume->setIsTimeVolume(false);
+
+		return ENOSYS;
+	}
+
+	int Rule::configureStorage(Pool *pool) {
+		(void) pool;
+
+		return ENOSYS;
+	}
+
 }

@@ -16,23 +16,15 @@
 #include <iostream>
 #include <assert.h>
 #include <rapidjson/schema.h>
+#include <mtfs/structs.h>
+#include <mtfs/Volume.h>
 
 /**
  *
  */
 namespace mtfs {
-
-	typedef struct ruleInfo_st {
-		uid_t uid;
-		gid_t gid;
-		uint64_t lastAccess;
-
-		ruleInfo_st() {
-			ruleInfo_st(0, 0, 0);
-		}
-
-		ruleInfo_st(uid_t uid, gid_t gid, uint64_t atime) : uid(uid), gid(gid), lastAccess(atime) {}
-	} ruleInfo_t;
+	class Pool;
+	class Volume;
 
 	/**
 	 * @interface
@@ -100,6 +92,9 @@ namespace mtfs {
 		 */
 		virtual bool satisfyRules(mtfs::ruleInfo_t info)=0;
 
+		virtual int configureStorage(Volume *volume);
+
+		virtual int configureStorage(Pool *pool);
 	};
 
 }  // namespace mtfs

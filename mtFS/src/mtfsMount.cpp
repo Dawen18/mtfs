@@ -2,6 +2,7 @@
  * @author David Wittwer
  * @date 05.05.17.
 **/
+#define FUSE_USE_VERSION 30
 
 #include <iostream>
 #include <sys/stat.h>
@@ -16,6 +17,7 @@
 #include <mtfsFuse/MtfsFuse.h>
 #include <utils/Fs.h>
 #include <boost/filesystem.hpp>
+#include <utils/Logger.h>
 
 #define HOME_DIR "/home/david/Cours/4eme/Travail_bachelor/Home"
 
@@ -29,6 +31,8 @@ int main(int argc, char **argv) {
 				"where device_in_system is a device wich was in the configuration." << endl;
 		return -1;
 	}
+
+	Logger::init(cerr, Logger::level::L_DEBUG);
 
 	string sysName = argv[argc - 1];
 	string filename = sysName + ".json";
@@ -58,7 +62,7 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	cout << boost::filesystem::current_path() << endl;
+	Logger::getInstance()->log("PWD", boost::filesystem::current_path().string(), Logger::L_INFO);
 
 //	build mtfs
 	mtfs::Mtfs::start(d, HOME_DIR, sysName);

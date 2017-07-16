@@ -50,7 +50,7 @@ namespace pluginSystem {
 		}
 
 		this->pluginMap[pluginName].destroyObj(plugin);
-		this->lastError=SUCCESS;
+		this->lastError = SUCCESS;
 	}
 
 	int PluginManager::getError() {
@@ -94,13 +94,15 @@ namespace pluginSystem {
 		plugin_t plugin;
 		string path = string("./") + PLUGIN_DIR + "/lib" + name + ".so";
 
+//		Open plugin
 		void *library = dlopen(path.c_str(), RTLD_LAZY);
 		if (!library) {
-			cerr << "Cannot loab library: " << dlerror() << endl;
+			cerr << "Cannot load plugin '" << name << "': " << dlerror() << endl;
 			return nullptr;
 		}
 		dlerror();
 
+//		Load createObj symbol
 		plugin.createObj = (pluginSystem::Plugin *(*)()) dlsym(library, "createObj");
 		char *dlsym_error = dlerror();
 		if (dlsym_error) {

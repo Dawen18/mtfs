@@ -44,6 +44,14 @@ namespace mtfsFuse {
 		mtfs::Mtfs::getInstance()->mkdir(req, parent, name, mode);
 	}
 
+	void MtfsFuse::unlink(fuse_req_t req, fuse_ino_t parent, const char *name) {
+		mtfs::Mtfs::getInstance()->unlink(req, parent, name);
+	}
+
+	void MtfsFuse::rmdir(fuse_req_t req, fuse_ino_t parent, const char *name) {
+		mtfs::Mtfs::getInstance()->rmdir(req, parent, name);
+	}
+
 	void MtfsFuse::open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
 		mtfs::Mtfs::getInstance()->open(req, ino, fi);
 	}

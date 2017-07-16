@@ -55,6 +55,10 @@ namespace mtfsFuse {
 		void write_buf(fuse_req_t req, fuse_ino_t ino, fuse_bufvec *bufv, off_t off, fuse_file_info *fi) override;
 
 		void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi) override;
+
+		void unlink(fuse_req_t req, fuse_ino_t parent, const char *name) override;
+
+		void rmdir(fuse_req_t req, fuse_ino_t parent, const char *name) override;
 	};
 
 }  // namespace mtfsFuse

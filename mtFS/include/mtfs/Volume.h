@@ -3,15 +3,14 @@
 
 #include <string>
 #include <vector>
+#include <climits>
 
 #include <rapidjson/document.h>
 #include <mtfs/structs.h>
 #include <pluginSystem/Plugin.h>
-#include "Visitor.h"
 
 namespace mtfs {
 	class Volume {
-		friend class Migrator;
 
 	public:
 		static constexpr const char *VOLUMES = "volumes";
@@ -19,6 +18,10 @@ namespace mtfs {
 	private:
 
 		pluginSystem::Plugin *plugin;
+
+		bool isTimeVolume;
+		uint64_t minDelay;
+		uint64_t maxDelay;
 
 		std::map<uint64_t, uint64_t> inodesAccess;
 		std::map<uint64_t, uint64_t> dirBlockAccess;
@@ -28,6 +31,12 @@ namespace mtfs {
 	public:
 		virtual ~Volume();
 
+		void setMinDelay(uint64_t minDelay);
+
+		void setMaxDelay(uint64_t maxDelay);
+
+		void setIsTimeVolume(bool b);
+
 		static bool validate(const rapidjson::Value &volume);
 
 		static void
@@ -36,10 +45,6 @@ namespace mtfs {
 		static void jsonToStruct(rapidjson::Value &src, volume_t &volume);
 
 		Volume(pluginSystem::Plugin *plugin);
-
-		void getBlockInfo(uint64_t blockId, blockInfo_st &info);
-
-		void setBlockInfo(uint64_t blockId, blockInfo_st &info);
 
 		int add(uint64_t &id, const queryType type);
 
@@ -51,8 +56,14 @@ namespace mtfs {
 
 		int put(const uint64_t &id, const void *data, queryType type);
 
-		void accept(class Visitor *v);
+		int getMetas(const uint64_t &id, blockInfo_t &metas, queryType type);
+
+		int putMetas(const uint64_t &id, const blockInfo_t &metas, queryType type);
+
+		int getUnsatisfy(std::vector<blockInfo_t> &unsatisfy, const queryType &type, const int limit = INT_MAX);
+
 	private:
+		int getOutOfTime(std::vector<uint64_t> &blocks, const queryType &type);
 
 		bool updateLastAccess(const uint64_t &id, const queryType type);
 	};

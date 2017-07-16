@@ -7,20 +7,30 @@
 #ifndef MTFS_MIGRATOR_H
 #define MTFS_MIGRATOR_H
 
-#include "Visitor.h"
-#include "TimeRule.h"
-#include "UserRightRule.h"
+#include <mutex>
+#include <condition_variable>
+#include "PoolManager.h"
 
 namespace mtfs {
-	class Migrator: public Visitor {
+	class Migrator {
+	private:
+		static const int MIGRATION_DELAY=10;
 
 	public:
-		void visit(class PoolManager *pm) override;
+		struct info_st {
+			std::mutex *endMutex;
+			std::condition_variable condV;
+			bool end;
+			PoolManager *poolManager;
 
-		void visit(class Pool *pool) override;
+			info_st() : endMutex(new std::mutex), end(false) {};
 
-		void visit(class Volume *volume) override;
+			~info_st() {
+				delete endMutex;
+			}
+		};
 
+		static void main(info_st *infos);
 	};
 }
 

@@ -7,7 +7,6 @@
 #include <iostream>
 #include <assert.h>
 #include <mtfs/structs.h>
-#include <mtfs/Rule.h>
 
 namespace mtfs {
 	typedef struct ruleInfo_st ruleInfo_t;
@@ -25,6 +24,9 @@ namespace mtfs {
 
 		virtual int put(const ident_t &id, const void *data, const queryType type)=0;
 
+		virtual int getMetas(const ident_t &id, blockInfo_t &metas, const queryType type)=0;
+
+		virtual int putMetas(const ident_t &id, const blockInfo_t &metas, const queryType type)=0;
 	};
 
 }  // namespace mtfs

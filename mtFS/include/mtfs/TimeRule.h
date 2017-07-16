@@ -31,6 +31,10 @@ namespace mtfs {
 
 		bool toJson(rapidjson::Value &json, rapidjson::Document::AllocatorType &allocator) override;
 
+		int configureStorage(Volume *volume) override;
+
+		int configureStorage(Pool *pool) override;
+
 	private:
 		uint64_t now();
 	};

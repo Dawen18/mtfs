@@ -2,14 +2,16 @@
 #include "mtfs/TimeRule.h"
 
 namespace mtfs {
-	TimeRule::TimeRule(uint64_t lowerLimit, uint64_t higerLimit) : lowerLimit(lowerLimit * 60),
-																   higerLimit(higerLimit * 60) {}
+	TimeRule::TimeRule(uint64_t lowerLimit, uint64_t higerLimit) : lowerLimit(lowerLimit),
+																   higerLimit(higerLimit) {}
 
 	bool TimeRule::satisfyRules(ruleInfo_st info) {
 		uint64_t now = this->now();
 		uint64_t delay = now - info.lastAccess;
 
-		if (0 == this->lowerLimit)
+		if (0 == this->lowerLimit && 0 == this->higerLimit)
+			return true;
+		else if (0 == this->lowerLimit)
 			return delay <= this->higerLimit;
 		else if (0 == this->higerLimit)
 			return delay >= this->lowerLimit;
@@ -56,6 +58,18 @@ namespace mtfs {
 
 	uint64_t TimeRule::now() {
 		return (uint64_t) time(NULL);
+	}
+
+	int TimeRule::configureStorage(Volume *volume) {
+		volume->setMinDelay(this->lowerLimit);
+		volume->setMaxDelay(this->higerLimit);
+		volume->setIsTimeVolume(true);
+
+		return 0;
+	}
+
+	int TimeRule::configureStorage(Pool *pool) {
+		return 0;
 	}
 
 }  // namespace mtfs

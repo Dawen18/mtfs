@@ -11,13 +11,12 @@
 
 #include "mtfs/Acces.h"
 #include "mtfs/Pool.h"
-#include "Visitor.h"
 
 namespace mtfs {
 	class Pool;
+	class Acces;
 
 	class PoolManager : public Acces {
-		friend class Migrator;
 
 	public:
 		static const int SUCCESS = 0;
@@ -59,7 +58,11 @@ namespace mtfs {
 
 		int put(const ident_t &id, const void *data, const queryType type) override;
 
-		void accept(class Visitor *visitor);
+		int getMetas(const ident_t &id, blockInfo_t &metas, const queryType type) override;
+
+		int putMetas(const ident_t &id, const blockInfo_t &metas, const queryType type) override;
+
+		void doMigration();
 
 	private:
 

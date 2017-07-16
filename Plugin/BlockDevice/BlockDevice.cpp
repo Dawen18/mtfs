@@ -223,6 +223,18 @@ namespace pluginSystem {
 		return this->SUCCESS;
 	}
 
+	int BlockDevice::getInodeMetas(const uint64_t &inodeId, mtfs::blockInfo_t &metas) {
+		string filename = this->mountpoint + "/" + INODE_METAS_DIR + "/" + to_string(inodeId) + ".json";
+
+		return getMetas(filename, metas);
+	}
+
+	int BlockDevice::putInodeMetas(const uint64_t &inodeId, const mtfs::blockInfo_t &metas) {
+		string filename = this->mountpoint + "/" + INODE_METAS_DIR + "/" + to_string(inodeId) + ".json";
+
+		return putMetas(filename, metas);
+	}
+
 	int BlockDevice::addDirBlock(uint64_t *id) {
 		unique_lock<mutex> lk(this->dirBlockMutex);
 		if (this->freeDirBlocks.size() == 0) {
@@ -311,6 +323,16 @@ namespace pluginSystem {
 		return this->SUCCESS;
 	}
 
+	int BlockDevice::getDirBlockMetas(const uint64_t &id, mtfs::blockInfo_t &metas) {
+		string filename = this->mountpoint + "/" + DIR_BLOCK_METAS_DIR + "/" + to_string(id) + ".json";
+		return getMetas(filename, metas);
+	}
+
+	int BlockDevice::putDirBlockMetas(const uint64_t &id, const mtfs::blockInfo_t &metas) {
+		string filename = this->mountpoint + "/" + DIR_BLOCK_METAS_DIR + "/" + to_string(id) + ".json";
+		return putMetas(filename, metas);
+	}
+
 	int BlockDevice::addBlock(uint64_t *blockId) {
 		unique_lock<mutex> lk(this->blockMutex);
 		if (this->freeBlocks.size() == 0) {
@@ -362,58 +384,16 @@ namespace pluginSystem {
 		return this->SUCCESS;
 	}
 
-	bool BlockDevice::getBlockMetas(const uint64_t &blockId, mtfs::blockInfo_t &metas) {
+	int BlockDevice::getBlockMetas(const uint64_t &blockId, mtfs::blockInfo_t &metas) {
 		string filename = this->mountpoint + "/" + BLOCK_METAS_DIR + "/" + to_string(blockId) + ".json";
-		ifstream file(filename);
-		if (!file.is_open())
-			return false;
 
-		IStreamWrapper wrapper(file);
-
-		Document d;
-		d.ParseStream(wrapper);
-
-		assert(d.HasMember(BI_REFF));
-		assert(d[BI_REFF].HasMember(ID_POOL));
-		assert(d[BI_REFF].HasMember(ID_VOLUME));
-		assert(d[BI_REFF].HasMember(ID_ID));
-		assert(d.HasMember(BI_ACCESS));
-
-		metas.referenceId.poolId = d[BI_REFF][ID_POOL].GetUint();
-		metas.referenceId.volumeId = d[BI_REFF][ID_VOLUME].GetUint();
-		metas.referenceId.id = d[BI_REFF][ID_ID].GetUint64();
-		metas.lastAccess = d[BI_ACCESS].GetUint64();
-
-		return true;
+		return getMetas(filename, metas);
 	}
 
-	bool BlockDevice::putBlockMetas(const uint64_t &blockId, const blockInfo_t &metas) {
-		Document d;
-		d.SetObject();
-		Document::AllocatorType &allocator = d.GetAllocator();
+	int BlockDevice::putBlockMetas(const uint64_t &blockId, const blockInfo_t &metas) {
+		string filename = this->mountpoint + "/" + BLOCK_METAS_DIR + "/" + to_string(blockId) + ".json";
 
-		Value v;
-
-		v.SetObject();
-		v.AddMember(StringRef(ID_POOL), Value(metas.referenceId.poolId), allocator);
-		v.AddMember(StringRef(ID_VOLUME), Value(metas.referenceId.volumeId), allocator);
-		v.AddMember(StringRef(ID_ID), Value(metas.referenceId.id), allocator);
-		d.AddMember(StringRef(BI_REFF), v, allocator);
-
-		v.SetUint64(metas.lastAccess);
-		d.AddMember(StringRef(BI_ACCESS), v, allocator);
-
-		StringBuffer bStrBuff;
-		PrettyWriter<StringBuffer> bWriter(bStrBuff);
-		d.Accept(bWriter);
-
-		string blockFilename = this->mountpoint + "/" + BLOCK_METAS_DIR + "/" + to_string(blockId) + ".json";
-		ofstream blockFile;
-		blockFile.open(blockFilename);
-		blockFile << bStrBuff.GetString() << endl;
-		blockFile.close();
-
-		return true;
+		return putMetas(filename, metas);
 	}
 
 	bool BlockDevice::getSuperblock(mtfs::superblock_t &superblock) {
@@ -439,6 +419,10 @@ namespace pluginSystem {
 			mkdir((this->mountpoint + "/" + BlockDevice::BLOCKS_DIR).c_str(), 0700);
 		if (!dirExists(this->mountpoint + "/" + BlockDevice::METAS_DIR))
 			mkdir((this->mountpoint + "/" + BlockDevice::METAS_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + "/" + BlockDevice::INODE_METAS_DIR))
+			mkdir((this->mountpoint + "/" + BlockDevice::INODE_METAS_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + "/" + BlockDevice::DIR_BLOCK_METAS_DIR))
+			mkdir((this->mountpoint + "/" + BlockDevice::DIR_BLOCK_METAS_DIR).c_str(), 0700);
 		if (!dirExists(this->mountpoint + "/" + BlockDevice::BLOCK_METAS_DIR))
 			mkdir((this->mountpoint + "/" + BlockDevice::BLOCK_METAS_DIR).c_str(), 0700);
 	}
@@ -642,6 +626,74 @@ namespace pluginSystem {
 		return SUCCESS;
 	}
 
+	int BlockDevice::getMetas(const std::string &filename, mtfs::blockInfo_t &infos) {
+		ifstream file(filename);
+		if (!file.is_open())
+			return 0 != errno ? errno : EAGAIN;
+
+		IStreamWrapper wrapper(file);
+
+		Document d;
+		d.ParseStream(wrapper);
+
+		assert(d.HasMember(BI_REFF));
+		assert(d[BI_REFF].IsArray());
+		assert(d.HasMember(BI_ACCESS));
+
+		for (auto &&id :d[BI_REFF].GetArray()) {
+			assert(id.IsObject());
+			assert(id.HasMember(ID_POOL));
+			assert(id.HasMember(ID_VOLUME));
+			assert(id.HasMember(ID_ID));
+
+			uint32_t poolId = id[ID_POOL].GetUint();
+			uint32_t volumeId = id[ID_VOLUME].GetUint();
+			uint64_t i = id[ID_ID].GetUint64();
+
+			infos.referenceId.push_back(ident_st(i, volumeId, poolId));
+		}
+
+		infos.lastAccess = d[BI_ACCESS].GetUint64();
+
+		return 0;
+	}
+
+	int BlockDevice::putMetas(const std::string &filename, const mtfs::blockInfo_t &infos) {
+		Document d;
+		d.SetObject();
+		Document::AllocatorType &allocator = d.GetAllocator();
+
+		Value v;
+
+		Value a(kArrayType);
+		for (auto &&id : infos.referenceId) {
+			v.SetObject();
+
+			v.AddMember(StringRef(ID_POOL), Value(id.poolId), allocator);
+			v.AddMember(StringRef(ID_VOLUME), Value(id.volumeId), allocator);
+			v.AddMember(StringRef(ID_ID), Value(id.id), allocator);
+
+			a.PushBack(v, allocator);
+		}
+		d.AddMember(StringRef(BI_REFF), a, allocator);
+
+		v.SetUint64(infos.lastAccess);
+		d.AddMember(StringRef(BI_ACCESS), v, allocator);
+
+		StringBuffer bStrBuff;
+		PrettyWriter<StringBuffer> bWriter(bStrBuff);
+		d.Accept(bWriter);
+
+		ofstream blockFile;
+		blockFile.open(filename);
+		if (!blockFile.is_open())
+			return -1;
+
+		blockFile << bStrBuff.GetString() << endl;
+		blockFile.close();
+
+		return 0;
+	}
 
 }  // namespace Plugin
 

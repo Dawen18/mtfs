@@ -9,6 +9,7 @@
 #include <boost/threadpool.hpp>
 #include <fuse3/fuse_lowlevel.h>
 #include "structs.h"
+#include "Migrator.h"
 #include <mutex>
 #include <condition_variable>
 #include <utils/Semaphore.h>
@@ -33,6 +34,7 @@ namespace mtfs {
 		void write_buf(fuse_req_t req, fuse_ino_t ino, fuse_bufvec *bufv, off_t off, fuse_file_info *fi);
 
 		void read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi);
+
 
 	private:
 //		CONFIG
@@ -63,6 +65,8 @@ namespace mtfs {
 		Acces *dirBlocks;
 		Acces *blocks;
 
+		std::thread migratorThr;
+		Migrator::info_st migratorInfo;
 
 	public:
 		static Mtfs *getInstance();
@@ -93,6 +97,12 @@ namespace mtfs {
 
 		void mknod(fuse_req_t req, fuse_ino_t parent, const std::string name, mode_t mode, dev_t rdev);
 
+		void mkdir(fuse_req_t req, fuse_ino_t ino, const char *name, mode_t mode);
+
+		void unlink(fuse_req_t req, fuse_ino_t parent, const char *name);
+
+		void rmdir(fuse_req_t req, fuse_ino_t parent, const char *name);
+
 		void access(fuse_req_t req, fuse_ino_t ino, int mask);
 
 		void open(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
@@ -107,7 +117,6 @@ namespace mtfs {
 
 		void releasedir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi);
 
-		void mkdir(fuse_req_t req, fuse_ino_t ino, const char *name, mode_t mode);
 
 		void write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off_t off, fuse_file_info *fi);
 
@@ -135,6 +144,9 @@ namespace mtfs {
 
 		void dlInodes(dl_st *src, dl_st *dst);
 
+		void initMetas(const internalInode_st &parentInode, const std::vector<ident_t> ids, const queryType type,
+					   boost::threadpool::pool *thPool = nullptr);
+
 //
 		void
 		dlInode(std::vector<ident_t> &ids, std::queue<std::pair<std::string, inode_t>> *queue, std::mutex *queueMutex,
@@ -160,6 +172,10 @@ namespace mtfs {
 		static internalInode_st *newInode(const mode_t &mode, const fuse_ctx *ctx);
 
 		static uint64_t now();
+
+		int doUnlink(internalInode_st *parent, const std::string name);
+
+		int delEntry(std::vector<ident_t> &ids, dirBlock_t &blk, const std::string &name);
 	};
 
 }  // namespace mtfs
