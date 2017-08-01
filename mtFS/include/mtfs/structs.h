@@ -42,6 +42,7 @@ namespace mtfs {
 		INODE,
 		DIR_BLOCK,
 		DATA_BLOCK,
+		SUPERBLOCK
 	};
 
 	typedef struct ruleInfo_st {

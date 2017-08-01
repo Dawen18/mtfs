@@ -5,7 +5,7 @@
 #include <vector>
 #include <list>
 #include <iostream>
-#include <assert.h>
+#include <cassert>
 
 #include <pluginSystem/Plugin.h>
 #include <mtfs/structs.h>
@@ -26,6 +26,8 @@ namespace pluginSystem {
 		static const int SUCCESS = 0;
 
 	public:
+		static constexpr const char *NAME = "block";
+
 		BlockDevice();
 
 		virtual ~BlockDevice();
@@ -34,41 +36,13 @@ namespace pluginSystem {
 
 		bool detach() override;
 
-		int addInode(uint64_t *inodeId) override;
+		int add(uint64_t *id, const mtfs::blockType &type) override;
 
-		int delInode(const uint64_t &inodeId) override;
+		int del(const uint64_t &id, const mtfs::blockType &type) override;
 
-		int getInode(const uint64_t &inodeId, mtfs::inode_st &inode) override;
+		int get(const uint64_t &id, void *data, const mtfs::blockType &type, bool metas) override;
 
-		int putInode(const uint64_t &inodeId, const mtfs::inode_st &inode) override;
-
-		int getInodeMetas(const uint64_t &inodeId, mtfs::blockInfo_t &metas) override;
-
-		int putInodeMetas(const uint64_t &inodeId, const mtfs::blockInfo_t &metas) override;
-
-		int addDirBlock(uint64_t *id) override;
-
-		int delDirBlock(const uint64_t &id) override;
-
-		int getDirBlock(const uint64_t &id, mtfs::dirBlock_t &block) override;
-
-		int putDirBlock(const uint64_t &id, const mtfs::dirBlock_t &block) override;
-
-		int getDirBlockMetas(const uint64_t &id, mtfs::blockInfo_t &metas) override;
-
-		int putDirBlockMetas(const uint64_t &id, const mtfs::blockInfo_t &metas) override;
-
-		int addBlock(uint64_t *blockId) override;
-
-		int delBlock(const uint64_t &blockId) override;
-
-		int getBlock(const uint64_t &blockId, std::uint8_t *buffer) override;
-
-		int putBlock(const uint64_t &blockId, const uint8_t *buffer) override;
-
-		int getBlockMetas(const uint64_t &blockId, mtfs::blockInfo_t &metas) override;
-
-		int putBlockMetas(const uint64_t &blockId, const mtfs::blockInfo_t &metas) override;
+		int put(const uint64_t &id, const void *data, const mtfs::blockType &type, bool metas) override;
 
 		bool getSuperblock(mtfs::superblock_t &superblock) override;
 
@@ -93,6 +67,43 @@ namespace pluginSystem {
 		std::mutex blockMutex;
 		std::vector<uint64_t> freeBlocks;
 		uint64_t nextFreeBlock;
+
+
+		int addInode(uint64_t *inodeId);
+
+		int addDirBlock(uint64_t *id);
+
+		int addBlock(uint64_t *blockId);
+
+		int delInode(const uint64_t &inodeId);
+
+		int getInode(const uint64_t &inodeId, mtfs::inode_st &inode);
+
+		int putInode(const uint64_t &inodeId, const mtfs::inode_st &inode);
+
+		int getInodeMetas(const uint64_t &inodeId, mtfs::blockInfo_t &metas);
+
+		int putInodeMetas(const uint64_t &inodeId, const mtfs::blockInfo_t &metas);
+
+		int delDirBlock(const uint64_t &id);
+
+		int getDirBlock(const uint64_t &id, mtfs::dirBlock_t &block);
+
+		int putDirBlock(const uint64_t &id, const mtfs::dirBlock_t &block);
+
+		int getDirBlockMetas(const uint64_t &id, mtfs::blockInfo_t &metas);
+
+		int putDirBlockMetas(const uint64_t &id, const mtfs::blockInfo_t &metas);
+
+		int delBlock(const uint64_t &blockId);
+
+		int getBlock(const uint64_t &blockId, std::uint8_t *buffer);
+
+		int putBlock(const uint64_t &blockId, const uint8_t *buffer);
+
+		int getBlockMetas(const uint64_t &blockId, mtfs::blockInfo_t &metas);
+
+		int putBlockMetas(const uint64_t &blockId, const mtfs::blockInfo_t &metas);
 
 
 		void initDirHierarchie();

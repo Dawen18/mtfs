@@ -9,8 +9,6 @@
 #include <rapidjson/istreamwrapper.h>
 #include <fstream>
 #include <memory>
-#include <mtfs/Mtfs.h>
-#include <mtfs/Pool.h>
 
 #include "BlockDevice.h"
 
@@ -22,7 +20,7 @@ using namespace mtfs;
 
 namespace pluginSystem {
 	BlockDevice::BlockDevice() : nextFreeBlock(0), nextFreeDirBlock(0), nextFreeInode(1) {
-		srand((unsigned int) time(NULL));
+		srand((unsigned int) time(nullptr));
 		this->freeBlocks.clear();
 		this->freeDirBlocks.clear();
 		this->freeInodes.clear();
@@ -35,7 +33,7 @@ namespace pluginSystem {
 	}
 
 	string BlockDevice::getName() {
-		return "block";
+		return NAME;
 	}
 
 	bool BlockDevice::attach(std::map<string, string> params) {
@@ -74,7 +72,7 @@ namespace pluginSystem {
 
 #ifndef DEBUG
 		//		Mount device
-		mount(this->devicePath.c_str(), this->mountpoint.c_str(), this->fsType.c_str(), 0, NULL);
+		mount(this->devicePath.c_str(), this->mountpoint.c_str(), this->fsType.c_str(), 0, nullptr);
 #endif
 
 		initDirHierarchie();
@@ -100,9 +98,110 @@ namespace pluginSystem {
 		return true;
 	}
 
+	int BlockDevice::add(uint64_t *id, const blockType &type) {
+		int ret;
+		switch (type) {
+			case INODE:
+				ret = this->addInode(id);
+				break;
+			case DIR_BLOCK:
+				ret = this->addDirBlock(id);
+				break;
+			case DATA_BLOCK:
+				ret = this->addBlock(id);
+				break;
+			default:
+				ret = ENOSYS;
+				break;
+		}
+		return ret;
+	}
+
+	int BlockDevice::del(const uint64_t &id, const mtfs::blockType &type) {
+		int ret;
+
+		switch (type) {
+			case INODE:
+				ret = this->delInode(id);
+				break;
+			case DIR_BLOCK:
+				ret = this->delDirBlock(id);
+				break;
+			case DATA_BLOCK:
+				ret = this->delBlock(id);
+				break;
+			default:
+				ret = ENOSYS;
+				break;
+		}
+
+		return ret;
+	}
+
+	int BlockDevice::get(const uint64_t &id, void *data, const mtfs::blockType &type, const bool metas) {
+		int ret;
+
+		switch (type) {
+			case INODE:
+				if (metas)
+					ret = this->getInodeMetas(id, *(blockInfo_t *) data);
+				else
+					ret = this->getInode(id, *(inode_t *) data);
+				break;
+			case DIR_BLOCK:
+				if (metas)
+					ret = this->getDirBlockMetas(id, *(blockInfo_t *) data);
+				else
+					ret = this->getDirBlock(id, *(dirBlock_t *) data);
+				break;
+			case DATA_BLOCK:
+				if (metas)
+					ret = this->getBlockMetas(id, *(blockInfo_t *) data);
+				else
+					ret = this->getBlock(id, (uint8_t *) data);
+				break;
+			default:
+				ret = ENOSYS;
+				break;
+		}
+
+		return ret;
+	}
+
+	int BlockDevice::put(const uint64_t &id, const void *data, const mtfs::blockType &type, const bool metas) {
+		int ret;
+
+		switch (type) {
+			case INODE:
+				if (metas)
+					ret = this->putInodeMetas(id, *(blockInfo_t *) data);
+				else
+					ret = this->putInode(id, *(inode_t *) data);
+				break;
+			case DIR_BLOCK:
+				if (metas)
+					ret = this->putDirBlockMetas(id, *(blockInfo_t *) data);
+				else
+					ret = this->putDirBlock(id, *(dirBlock_t *) data);
+				break;
+			case DATA_BLOCK:
+				if (metas)
+					ret = this->putBlockMetas(id, *(blockInfo_t *) data);
+				else
+					ret = this->putBlock(id, (uint8_t *) data);
+				break;
+			default:
+				ret = ENOSYS;
+				break;
+		}
+
+		return ret;
+	}
+
+
 	int BlockDevice::addInode(uint64_t *inodeId) {
 		unique_lock<mutex> lk(this->inodeMutex);
-		if (this->freeInodes.size() == 0) {
+		if (this->freeInodes.empty()) {
 			*inodeId = this->nextFreeInode;
 			this->nextFreeInode++;
 		} else {
@@ -237,7 +336,7 @@ namespace pluginSystem {
 
 	int BlockDevice::addDirBlock(uint64_t *id) {
 		unique_lock<mutex> lk(this->dirBlockMutex);
-		if (this->freeDirBlocks.size() == 0) {
+		if (this->freeDirBlocks.empty()) {
 			*id = this->nextFreeDirBlock;
 			this->nextFreeDirBlock++;
 		} else {
@@ -695,6 +794,7 @@ namespace pluginSystem {
 		return 0;
 	}
 
+
 }  // namespace Plugin
 
 extern "C" pluginSystem::Plugin *createObj() {
@@ -707,11 +807,11 @@ extern "C" void destroyObj(pluginSystem::Plugin *plugin) {
 
 extern "C" pluginSystem::pluginInfo_t getInfo() {
 	vector<string> params;
-	params.push_back("devicePath");
-	params.push_back("fsType");
+	params.emplace_back("devicePath");
+	params.emplace_back("fsType");
 
 	pluginSystem::pluginInfo_t info = {
-			.name = "block",
+			.name = pluginSystem::BlockDevice::NAME,
 			.params = params,
 	};
 

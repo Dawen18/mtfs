@@ -13,7 +13,7 @@
 using namespace std;
 using namespace pluginSystem;
 
-const string HOME = "/home/david/Cours/4eme/Travail_bachelor/Home/Plugins/";
+#define HOME "/home/david/Cours/4eme/Travail_bachelor/Home/Plugins/"
 
 TEST(BlockDevice, attachDetach) {
 #ifndef DEBUG
@@ -62,33 +62,33 @@ public:
 
 TEST_F(BlockDeviceFixture, addInode) {
 	uint64_t inode = 0;
-	ASSERT_EQ(0, blockDevice.addInode(&inode));
+	ASSERT_EQ(0, blockDevice.add(&inode, mtfs::blockType::INODE));
 	ASSERT_NE(0, inode);
 
 	uint64_t inode2 = 0;
-	ASSERT_EQ(0, blockDevice.addInode(&inode2));
+	ASSERT_EQ(0, blockDevice.add(&inode2, mtfs::blockType::INODE));
 	ASSERT_NE(0, inode2);
 	ASSERT_GT(inode2, inode);
 
 	uint64_t inode3 = 0;
-	ASSERT_EQ(0, blockDevice.addInode(&inode3));
+	ASSERT_EQ(0, blockDevice.add(&inode3, mtfs::blockType::INODE));
 }
 
 TEST_F(BlockDeviceFixture, delInode) {
 	uint64_t inode;
-	blockDevice.addInode(&inode);
-	ASSERT_EQ(0, blockDevice.delInode(inode));
+	blockDevice.add(&inode, mtfs::blockType::INODE);
+	ASSERT_EQ(0, blockDevice.del(inode, mtfs::blockType::INODE));
 
 	uint64_t inode2;
-	blockDevice.addInode(&inode2);
-	blockDevice.addInode(&inode2);
-	blockDevice.addInode(&inode2);
-	blockDevice.delInode(inode);
+	blockDevice.add(&inode2, mtfs::blockType::INODE);
+	blockDevice.add(&inode2, mtfs::blockType::INODE);
+	blockDevice.add(&inode2, mtfs::blockType::INODE);
+	blockDevice.del(inode, mtfs::blockType::INODE);
 }
 
 TEST_F(BlockDeviceFixture, writeInode) {
 	uint64_t inodeId;
-	blockDevice.addInode(&inodeId);
+	blockDevice.add(&inodeId, mtfs::blockType::INODE);
 
 	mtfs::ident_t oIdent;
 	oIdent.id = 42;
@@ -109,18 +109,14 @@ TEST_F(BlockDeviceFixture, writeInode) {
 		vector<mtfs::ident_t> blocks;
 
 		for (uint j = 0; j < 3; ++j) {
-			mtfs::ident_t ident = {
-					.poolId = 1,
-					.volumeId = j,
-					.id = i * 3 + j,
-			};
+			mtfs::ident_t ident = mtfs::ident_t(1, j, i * 3 + j);
 
 			blocks.push_back(ident);
 		}
 		ino.dataBlocks.push_back(blocks);
 	}
 
-	ASSERT_EQ(0, blockDevice.putInode(inodeId, ino));
+	ASSERT_EQ(0, blockDevice.put(inodeId, &ino, mtfs::blockType::INODE, false));
 }
 
 TEST_F(BlockDeviceFixture, readInode) {
@@ -140,11 +136,7 @@ TEST_F(BlockDeviceFixture, readInode) {
 		vector<mtfs::ident_t> blocks;
 
 		for (uint j = 0; j < 3; ++j) {
-			mtfs::ident_t ident = {
-					.poolId = 1,
-					.volumeId = j,
-					.id = i * 3 + j,
-			};
+			mtfs::ident_t ident = mtfs::ident_t(1, j, i * 3 + j);
 
 			blocks.push_back(ident);
 		}
@@ -152,42 +144,42 @@ TEST_F(BlockDeviceFixture, readInode) {
 	}
 
 	uint64_t inodeId;
-	blockDevice.addInode(&inodeId);
+	blockDevice.add(&inodeId, mtfs::blockType::INODE);
 	cout << "inodeId " << inodeId << "  " << endl;
-	blockDevice.putInode(inodeId, original);
-	ASSERT_EQ(0, blockDevice.getInode(inodeId, inode));
+	blockDevice.put(inodeId, &original, mtfs::blockType::INODE, false);
+	ASSERT_EQ(0, blockDevice.get(inodeId, &inode, mtfs::blockType::INODE, false));
 
 //	cout << original.accesRight << " " << inode.accesRight << endl;
 	ASSERT_EQ(original, inode);
 	original.size = 2048;
-	blockDevice.putInode(inodeId, original);
-	ASSERT_EQ(0, blockDevice.getInode(inodeId, inode));
+	blockDevice.put(inodeId, &original, mtfs::blockType::INODE, false);
+	ASSERT_EQ(0, blockDevice.get(inodeId, &inode, mtfs::blockType::INODE, false));
 }
 
 TEST_F(BlockDeviceFixture, addBlock) {
 	uint64_t block = 0;
-	ASSERT_EQ(0, blockDevice.addBlock(&block));
+	ASSERT_EQ(0, blockDevice.add(&block, mtfs::blockType::DATA_BLOCK));
 	ASSERT_NE(0, block);
 
 	uint64_t block2 = 0;
-	ASSERT_EQ(0, blockDevice.addBlock(&block2));
+	ASSERT_EQ(0, blockDevice.add(&block2, mtfs::blockType::DATA_BLOCK));
 	ASSERT_NE(0, block2);
 	ASSERT_GT(block2, block);
 
 	uint64_t block3 = 0;
-	ASSERT_EQ(0, blockDevice.addBlock(&block3));
+	ASSERT_EQ(0, blockDevice.add(&block3, mtfs::blockType::DATA_BLOCK));
 }
 
 TEST_F(BlockDeviceFixture, delBlock) {
 	uint64_t block;
-	blockDevice.addBlock(&block);
-	ASSERT_EQ(0, blockDevice.delBlock(block));
+	blockDevice.add(&block, mtfs::blockType::DATA_BLOCK);
+	ASSERT_EQ(0, blockDevice.del(block, mtfs::blockType::DATA_BLOCK));
 
 	uint64_t block2;
-	blockDevice.addBlock(&block2);
-	blockDevice.addBlock(&block2);
-	blockDevice.addBlock(&block2);
-	blockDevice.delBlock(block);
+	blockDevice.add(&block2, mtfs::blockType::DATA_BLOCK);
+	blockDevice.add(&block2, mtfs::blockType::DATA_BLOCK);
+	blockDevice.add(&block2, mtfs::blockType::DATA_BLOCK);
+	blockDevice.del(block, mtfs::blockType::DATA_BLOCK);
 }
 
 TEST_F(BlockDeviceFixture, writeBlock) {
@@ -198,8 +190,8 @@ TEST_F(BlockDeviceFixture, writeBlock) {
 	}
 
 	uint64_t blockId;
-	blockDevice.addBlock(&blockId);
-	ASSERT_EQ(0, blockDevice.putBlock(blockId, block));
+	blockDevice.add(&blockId, mtfs::blockType::DATA_BLOCK);
+	ASSERT_EQ(0, blockDevice.put(blockId, &block, mtfs::blockType::DATA_BLOCK, false));
 }
 
 TEST_F(BlockDeviceFixture, readBlock) {
@@ -214,10 +206,10 @@ TEST_F(BlockDeviceFixture, readBlock) {
 	}
 
 	uint64_t blockId;
-	blockDevice.addBlock(&blockId);
-	blockDevice.putBlock(blockId, block);
+	blockDevice.add(&blockId, mtfs::blockType::DATA_BLOCK);
+	blockDevice.put(blockId, &block, mtfs::blockType::DATA_BLOCK, false);
 
-	ASSERT_EQ(0, blockDevice.getBlock(blockId, readBlock));
+	ASSERT_EQ(0, blockDevice.get(blockId, &readBlock, mtfs::blockType::DATA_BLOCK, false));
 	ASSERT_TRUE(0 == memcmp(block, readBlock, BLOCK_SIZE));
 }
 
@@ -228,14 +220,14 @@ TEST_F(BlockDeviceFixture, rootInode) {
 	inode.gid = 1000;
 	inode.size = 1024;
 	inode.linkCount = 2;
-	inode.atime = (uint64_t) time(NULL);
+	inode.atime = (uint64_t) time(nullptr);
 	inode.referenceId.clear();
 	inode.dataBlocks.clear();
 
 	mtfs::inode_t readInode;
 
-	ASSERT_EQ(0, blockDevice.putInode(0, inode));
-	ASSERT_EQ(0, blockDevice.getInode(0, readInode));
+	ASSERT_EQ(0, blockDevice.put(0, &inode, mtfs::blockType::INODE, false));
+	ASSERT_EQ(0, blockDevice.get(0, &readInode, mtfs::blockType::INODE, false));
 	ASSERT_EQ(inode, readInode);
 }
 
@@ -247,7 +239,7 @@ TEST_F(BlockDeviceFixture, superblock) {
 	for (int i = 0; i < 5; ++i) {
 		mtfs::pool_t pool;
 		pool.migration = 0;
-		pool.rule = NULL;
+		pool.rule = nullptr;
 		pool.volumes.clear();
 		superblock.pools[i] = pool;
 	}
@@ -264,11 +256,11 @@ TEST_F(BlockDeviceFixture, putMetas) {
 
 	blockInfo.referenceId.push_back(ident1);
 	blockInfo.referenceId.push_back(ident2);
-	blockInfo.lastAccess = (uint64_t) time(NULL);
+	blockInfo.lastAccess = (uint64_t) time(nullptr);
 
-	ASSERT_EQ(0, blockDevice.putInodeMetas(1, blockInfo));
-	ASSERT_EQ(0, blockDevice.putDirBlockMetas(1, blockInfo));
-	ASSERT_EQ(0, blockDevice.putBlockMetas(1, blockInfo));
+	ASSERT_EQ(0, blockDevice.put(1, &blockInfo, mtfs::blockType::INODE, true));
+	ASSERT_EQ(0, blockDevice.put(1, &blockInfo, mtfs::blockType::DIR_BLOCK, true));
+	ASSERT_EQ(0, blockDevice.put(1, &blockInfo, mtfs::blockType::DATA_BLOCK, true));
 }
 
 TEST_F(BlockDeviceFixture, getMetas) {
@@ -281,20 +273,20 @@ TEST_F(BlockDeviceFixture, getMetas) {
 
 	blockInfo.referenceId.push_back(ident1);
 	blockInfo.referenceId.push_back(ident2);
-	blockInfo.lastAccess = (uint64_t) time(NULL);
+	blockInfo.lastAccess = (uint64_t) time(nullptr);
 
-	ASSERT_EQ(0, blockDevice.putInodeMetas(2, blockInfo));
-	ASSERT_EQ(0, blockDevice.getInodeMetas(2, receiveInfo));
+	ASSERT_EQ(0, blockDevice.put(2, &blockInfo, mtfs::blockType::INODE, true));
+	ASSERT_EQ(0, blockDevice.get(2, &receiveInfo, mtfs::blockType::INODE, true));
 	ASSERT_EQ(blockInfo, receiveInfo);
 
 	receiveInfo = mtfs::blockInfo_t();
-	ASSERT_EQ(0, blockDevice.putDirBlockMetas(2, blockInfo));
-	ASSERT_EQ(0, blockDevice.getDirBlockMetas(2, receiveInfo));
+	ASSERT_EQ(0, blockDevice.put(2, &blockInfo, mtfs::blockType::DIR_BLOCK, true));
+	ASSERT_EQ(0, blockDevice.get(2, &receiveInfo, mtfs::blockType::DIR_BLOCK, true));
 	ASSERT_EQ(blockInfo, receiveInfo);
 
 	receiveInfo = mtfs::blockInfo_t();
-	ASSERT_EQ(0, blockDevice.putBlockMetas(2, blockInfo));
-	ASSERT_EQ(0, blockDevice.getBlockMetas(2, receiveInfo));
+	ASSERT_EQ(0, blockDevice.put(2, &blockInfo, mtfs::blockType::DATA_BLOCK, true));
+	ASSERT_EQ(0, blockDevice.get(2, &receiveInfo, mtfs::blockType::DATA_BLOCK, true));
 	ASSERT_EQ(blockInfo, receiveInfo);
 }
 
@@ -317,12 +309,12 @@ TEST_F(BlockDeviceFixture, putDirBlock) {
 
 	uint64_t dId = 0;
 
-	ASSERT_EQ(0, blockDevice.addDirBlock(&dId));
+	ASSERT_EQ(0, blockDevice.add(&dId, mtfs::blockType::DIR_BLOCK));
 	EXPECT_LE(0, dId);
-	ASSERT_EQ(0, blockDevice.putDirBlock(dId, block));
+	ASSERT_EQ(0, blockDevice.put(dId, &block, mtfs::blockType::DIR_BLOCK, false));
 
 	mtfs::dirBlock_t readBlock;
-	ASSERT_EQ(0, blockDevice.getDirBlock(dId, readBlock));
+	ASSERT_EQ(0, blockDevice.get(dId, &readBlock, mtfs::blockType::DIR_BLOCK, false));
 	ASSERT_EQ(block.entries.size(), readBlock.entries.size());
 	for (auto &&item: block.entries) {
 		ASSERT_NE(readBlock.entries.end(), readBlock.entries.find(item.first));
@@ -333,7 +325,7 @@ TEST_F(BlockDeviceFixture, putDirBlock) {
 		}
 	}
 
-	ASSERT_EQ(0, blockDevice.delDirBlock(dId));
+	ASSERT_EQ(0, blockDevice.del(dId, mtfs::blockType::DIR_BLOCK));
 }
 
 int main(int argc, char **argv) {

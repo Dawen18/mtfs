@@ -1,6 +1,5 @@
 #include <pluginSystem/PluginManager.h>
 #include <thread>
-#include <climits>
 #include <boost/thread.hpp>
 #include <boost/threadpool/pool.hpp>
 #include "mtfs/Volume.h"
@@ -30,7 +29,7 @@ namespace mtfs {
 		pluginSystem::PluginManager *manager = pluginSystem::PluginManager::getInstance();
 
 		pluginSystem::Plugin *plugin = manager->getPlugin(volType);
-		if (plugin == NULL)
+		if (nullptr == plugin)
 			return false;
 
 		pluginSystem::pluginInfo_t info;
@@ -79,47 +78,53 @@ namespace mtfs {
 		}
 	}
 
-	int Volume::add(uint64_t &id, const blockType type) {
+	int Volume::add(uint64_t &id, const blockType &type) {
 		int ret;
-		switch (type) {
-			case INODE:
-				ret = this->plugin->addInode(&id);
-				break;
-			case DIR_BLOCK:
-				ret = this->plugin->addDirBlock(&id);
-				break;
-			case DATA_BLOCK:
-				ret = this->plugin->addBlock(&id);
-				break;
-			default:
-				ret = ENOSYS;
+		ret = this->plugin->add(&id, type);
+
+		if (ENOSYS == ret) {
 //				TODO log noimplemented
-				break;
 		}
+//		switch (type) {
+//			case INODE:
+//				ret = this->plugin->addInode(&id);
+//				break;
+//			case DIR_BLOCK:
+//				ret = this->plugin->addDirBlock(&id);
+//				break;
+//			case DATA_BLOCK:
+//				ret = this->plugin->addBlock(&id);
+//				break;
+//			default:
+//				ret = ENOSYS;
+//				break;
+//		}
 		return ret;
 	}
 
-	int Volume::add(std::vector<uint64_t> &ids, const int nb, const blockType type) {
+	int Volume::add(std::vector<uint64_t> &ids, const int &nb, const blockType &type) {
 		boost::threadpool::pool thPool((size_t) nb);
 
 		vector<uint64_t *> tmp;
 		for (int i = 0; i < nb; ++i) {
-			uint64_t *id = new uint64_t();
+			uint64_t *id;
+			id = new uint64_t();
 			tmp.push_back(id);
-			switch (type) {
-				case INODE:
-					thPool.schedule(bind(&pluginSystem::Plugin::addInode, this->plugin, id));
-					break;
-				case DIR_BLOCK:
-					thPool.schedule(bind(&pluginSystem::Plugin::addDirBlock, this->plugin, id));
-					break;
-				case DATA_BLOCK:
-					thPool.schedule(bind(&pluginSystem::Plugin::addBlock, this->plugin, id));
-					break;
-				default:
+			thPool.schedule(bind(&pluginSystem::Plugin::add, this->plugin, id, type));
+//			switch (type) {
+//				case INODE:
+//					thPool.schedule(bind(&pluginSystem::Plugin::add, this->plugin, id, type));
+//					break;
+//				case DIR_BLOCK:
+//					thPool.schedule(bind(&pluginSystem::Plugin::add, this->plugin, id, type));
+//					break;
+//				case DATA_BLOCK:
+//					thPool.schedule(bind(&pluginSystem::Plugin::add, this->plugin, id, type));
+//					break;
+//				default:
 //					TODO log
-					break;
-			}
+//					break;
+//			}
 		}
 
 		thPool.wait();
@@ -132,45 +137,38 @@ namespace mtfs {
 		return 0;
 	}
 
-	int Volume::del(const uint64_t &id, const blockType type) {
+	int Volume::del(const uint64_t &id, const blockType &type) {
 		int ret;
+		ret = this->plugin->del(id, type);
 
-		switch (type) {
-			case INODE:
-				ret = this->plugin->delInode(id);
-				break;
-			case DIR_BLOCK:
-				ret = this->plugin->delDirBlock(id);
-				break;
-			case DATA_BLOCK:
-				ret = this->plugin->delBlock(id);
-				break;
-			default:
-				ret = ENOSYS;
+		if (ENOSYS == ret) {
 //				TODO log noimplemented
-				break;
 		}
+
+//		switch (type) {
+//			case INODE:
+//				ret = this->plugin->delInode(id);
+//				break;
+//			case DIR_BLOCK:
+//				ret = this->plugin->delDirBlock(id);
+//				break;
+//			case DATA_BLOCK:
+//				ret = this->plugin->delBlock(id);
+//				break;
+//			default:
+//				ret = ENOSYS;
+//				break;
+//		}
 
 		return ret;
 	}
 
-	int Volume::get(const uint64_t &id, void *data, blockType type) {
+	int Volume::get(const uint64_t &id, void *data, const blockType &type) {
 		int ret;
+		ret = this->plugin->get(id, data, type, false);
 
-		switch (type) {
-			case INODE:
-				ret = this->plugin->getInode(id, *(inode_t *) data);
-				break;
-			case DIR_BLOCK:
-				ret = this->plugin->getDirBlock(id, *(dirBlock_t *) data);
-				break;
-			case DATA_BLOCK:
-				ret = this->plugin->getBlock(id, (uint8_t *) data);
-				break;
-			default:
-				ret = ENOSYS;
+		if (ENOSYS == ret) {
 //				TODO log noimplemented
-				break;
 		}
 
 		this->updateLastAccess(id, type);
@@ -178,47 +176,39 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Volume::put(const uint64_t &id, const void *data, blockType type) {
+	int Volume::put(const uint64_t &id, const void *data, const blockType &type) {
 		int ret;
+		ret = this->plugin->put(id, data, type, false);
 
-		switch (type) {
-			case INODE:
-				ret = this->plugin->putInode(id, *(inode_t *) data);
-				break;
-			case DIR_BLOCK:
-				ret = this->plugin->putDirBlock(id, *(dirBlock_t *) data);
-				break;
-			case DATA_BLOCK:
-				ret = this->plugin->putBlock(id, (uint8_t *) data);
-				break;
-			default:
-				ret = ENOSYS;
+		if (ENOSYS == ret) {
 //				TODO log noimplemented
-				break;
 		}
+
 		this->updateLastAccess(id, type);
 
 		return ret;
 	}
 
-	int Volume::getMetas(const uint64_t &id, blockInfo_t &metas, blockType type) {
+	int Volume::getMetas(const uint64_t &id, blockInfo_t &metas, const blockType &type) {
 		int ret;
+
+		ret = this->plugin->get(id, &metas, type, true);
 
 		map<uint64_t, uint64_t> *access = nullptr;
 		mutex *mu;
 		switch (type) {
 			case INODE:
-				ret = this->plugin->getInodeMetas(id, metas);
+//				ret = this->plugin->getInodeMetas(id, metas);
 				mu = &this->iaMutex;
 				access = &this->inodesAccess;
 				break;
 			case DIR_BLOCK:
-				ret = this->plugin->getDirBlockMetas(id, metas);
+//				ret = this->plugin->getDirBlockMetas(id, metas);
 				mu = &this->daMutex;
 				access = &this->dirBlockAccess;
 				break;
 			case DATA_BLOCK:
-				ret = this->plugin->getBlockMetas(id, metas);
+//				ret = this->plugin->getBlockMetas(id, metas);
 				mu = &this->baMutex;
 				access = &this->blocksAccess;
 				break;
@@ -235,23 +225,11 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Volume::putMetas(const uint64_t &id, const blockInfo_t &metas, blockType type) {
-		switch (type) {
-			case INODE:
-				return this->plugin->putInodeMetas(id, metas);
-				break;
-			case DIR_BLOCK:
-				return this->plugin->putDirBlockMetas(id, metas);
-				break;
-			case DATA_BLOCK:
-				return this->plugin->putBlockMetas(id, metas);
-				break;
-			default:
-				return ENOSYS;
-		}
+	int Volume::putMetas(const uint64_t &id, const blockInfo_t &metas, const blockType &type) {
+		return this->plugin->put(id, &metas, type, true);
 	}
 
-	bool Volume::updateLastAccess(const uint64_t &id, const blockType type) {
+	bool Volume::updateLastAccess(const uint64_t &id, const blockType &type) {
 		map<uint64_t, uint64_t> *mp;
 		mutex *mu;
 		switch (type) {
@@ -274,7 +252,8 @@ namespace mtfs {
 		blockInfo_t metas = blockInfo_t();
 		this->getMetas(id, metas, type);
 
-		uint64_t now = (uint64_t) time(NULL);
+		uint64_t now;
+		now = (uint64_t) time(nullptr);
 		{
 			unique_lock<mutex> lk(*mu);
 			(*mp)[id] = now;
@@ -321,7 +300,8 @@ namespace mtfs {
 	}
 
 	int Volume::getOutOfTime(vector<uint64_t> &blocks, const blockType &type) {
-		uint64_t now = (uint64_t) time(NULL);
+		uint64_t now;
+		now = (uint64_t) time(nullptr);
 		const uint64_t maxTimestamp = now - this->minDelay;
 		const uint64_t minTimestamp = 0 == this->maxDelay ? 0 : now - this->maxDelay;
 

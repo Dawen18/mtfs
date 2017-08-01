@@ -48,28 +48,28 @@ namespace mtfs {
 
 		static void jsonToStruct(rapidjson::Value &src, volume_t &volume);
 
-		Volume(pluginSystem::Plugin *plugin);
+		explicit Volume(pluginSystem::Plugin *plugin);
 
-		int add(uint64_t &id, const blockType type);
+		int add(uint64_t &id, const blockType &type);
 
-		int add(std::vector<uint64_t> &ids, const int nb, const blockType type);
+		int add(std::vector<uint64_t> &ids, const int &nb, const blockType &type);
 
-		int del(const uint64_t &id, const blockType type);
+		int del(const uint64_t &id, const blockType &type);
 
-		int get(const uint64_t &id, void *data, blockType type);
+		int get(const uint64_t &id, void *data, const blockType &type);
 
-		int put(const uint64_t &id, const void *data, blockType type);
+		int put(const uint64_t &id, const void *data, const blockType &type);
 
-		int getMetas(const uint64_t &id, blockInfo_t &metas, blockType type);
+		int getMetas(const uint64_t &id, blockInfo_t &metas, const blockType &type);
 
-		int putMetas(const uint64_t &id, const blockInfo_t &metas, blockType type);
+		int putMetas(const uint64_t &id, const blockInfo_t &metas, const blockType &type);
 
-		int getUnsatisfy(std::vector<blockInfo_t> &unsatisfy, const blockType &type, const int limit = INT_MAX);
+		int getUnsatisfy(std::vector<blockInfo_t> &unsatisfy, const blockType &type, int limit = INT_MAX);
 
 	private:
 		int getOutOfTime(std::vector<uint64_t> &blocks, const blockType &type);
 
-		bool updateLastAccess(const uint64_t &id, const blockType type);
+		bool updateLastAccess(const uint64_t &id, const blockType &type);
 	};
 
 }  // namespace mtfs
