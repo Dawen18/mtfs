@@ -1,4 +1,5 @@
 #include <mtfs/PoolManager.h>
+#include <utils/Logger.h>
 
 namespace mtfs {
 	using namespace std;
@@ -23,7 +24,7 @@ namespace mtfs {
 		return SUCCESS;
 	}
 
-	int PoolManager::add(const ruleInfo_t &info, std::vector<ident_t> &ids, const queryType type,
+	int PoolManager::add(const ruleInfo_t &info, std::vector<ident_t> &ids, const blockType type,
 						 const size_t nb) {
 		int ret;
 		vector<uint32_t> poolIds;
@@ -67,7 +68,7 @@ namespace mtfs {
 		return ret;
 	}
 
-	int PoolManager::del(const ident_t &id, const queryType type) {
+	int PoolManager::del(const ident_t &id, const blockType type) {
 		int ret = IS_LOCKED;
 
 		ident_t newId = id;
@@ -79,7 +80,7 @@ namespace mtfs {
 		return ret;
 	}
 
-	int PoolManager::get(const ident_t &id, void *data, const queryType type) {
+	int PoolManager::get(const ident_t &id, void *data, const blockType type) {
 		int ret = IS_LOCKED;
 
 		ident_t newId = id;
@@ -91,7 +92,7 @@ namespace mtfs {
 		return ret;
 	}
 
-	int PoolManager::put(const ident_t &id, const void *data, const queryType type) {
+	int PoolManager::put(const ident_t &id, const void *data, const blockType type) {
 		int ret = IS_LOCKED;
 
 		ident_t newId = id;
@@ -108,7 +109,7 @@ namespace mtfs {
 		return ret;
 	}
 
-	int PoolManager::getMetas(const ident_t &id, blockInfo_t &metas, const queryType type) {
+	int PoolManager::getMetas(const ident_t &id, blockInfo_t &metas, const blockType type) {
 		int ret = IS_LOCKED;
 
 		ident_t newId = id;
@@ -120,7 +121,7 @@ namespace mtfs {
 		return ret;
 	}
 
-	int PoolManager::putMetas(const ident_t &id, const blockInfo_t &metas, const queryType type) {
+	int PoolManager::putMetas(const ident_t &id, const blockInfo_t &metas, const blockType type) {
 		int ret = IS_LOCKED;
 
 		ident_t newId = id;
@@ -137,13 +138,26 @@ namespace mtfs {
 		return ret;
 	}
 
-	void PoolManager::doMigration() {
+	void PoolManager::doMigration(const blockType type) {
+		vector<ident_t> unsatisfyBlk;
+
 		for (auto &&pool: this->pools) {
-			pool.second->doMigration();
+			map<ident_t, ident_t> tmpMovedBlk;
+			pool.second->doMigration(tmpMovedBlk, unsatisfyBlk, type);
+			for (auto &&item :tmpMovedBlk) {
+				ident_t key = item.first;
+				ident_t val = item.second;
+
+				key.poolId = pool.first;
+				val.poolId = pool.first;
+				this->blockTranslateMap.insert(make_pair(key, val));
+			}
+
+			Logger::getInstance()->log("Poolmanager", "endMig",Logger::level::L_DEBUG);
 		}
 	}
 
-	bool PoolManager::isLocked(const ident_t &id, const queryType &type) {
+	bool PoolManager::isLocked(const ident_t &id, const blockType &type) {
 		mutex *mu = nullptr;
 		set<ident_t> *lSet = nullptr;
 
@@ -169,7 +183,7 @@ namespace mtfs {
 		return lSet->find(id) != lSet->end();
 	}
 
-	bool PoolManager::lock(const ident_t &id, const queryType &type) {
+	bool PoolManager::lock(const ident_t &id, const blockType &type) {
 		mutex *mu = nullptr;
 		set<ident_t> *lSet = nullptr;
 
@@ -201,7 +215,7 @@ namespace mtfs {
 		return true;
 	}
 
-	bool PoolManager::unlock(const ident_t &id, const queryType &type) {
+	bool PoolManager::unlock(const ident_t &id, const blockType &type) {
 		mutex *mu = nullptr;
 		set<ident_t> *lSet = nullptr;
 
@@ -233,7 +247,7 @@ namespace mtfs {
 		return true;
 	}
 
-	bool PoolManager::hasMoved(const ident_t &id, ident_t &newId, const queryType &type) {
+	bool PoolManager::hasMoved(const ident_t &id, ident_t &newId, const blockType &type) {
 		mutex *mu = nullptr;
 		map<ident_t, ident_t> *transMap = nullptr;
 

@@ -4,6 +4,7 @@
 using namespace std;
 
 namespace mtfs {
+	Pool::Pool(const size_t blkSize) : blockSize(blkSize) {}
 
 	Pool::~Pool() {
 		for (auto &&vol: this->volumes) {
@@ -92,7 +93,7 @@ namespace mtfs {
 		return 0;
 	}
 
-	int Pool::add(const ruleInfo_t &info, std::vector<ident_t> &idents, const queryType type, const int nb) {
+	int Pool::add(const ruleInfo_t &info, std::vector<ident_t> &idents, const blockType type, const int nb) {
 		int ret;
 		vector<uint32_t> volumeIds;
 		if (0 != (ret = this->getValidVolumes(info, volumeIds))) {
@@ -134,23 +135,23 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Pool::del(const uint32_t &volumeId, const uint64_t &id, const queryType type) {
+	int Pool::del(const uint32_t &volumeId, const uint64_t &id, const blockType type) {
 		return this->volumes[volumeId]->del(id, type);
 	}
 
-	int Pool::get(const uint32_t &volumeId, const uint64_t &id, void *data, const queryType type) {
+	int Pool::get(const uint32_t &volumeId, const uint64_t &id, void *data, const blockType type) {
 		return this->volumes[volumeId]->get(id, data, type);
 	}
 
-	int Pool::put(const uint32_t &volumeId, const uint64_t &id, const void *data, const queryType type) {
+	int Pool::put(const uint32_t &volumeId, const uint64_t &id, const void *data, const blockType type) {
 		return this->volumes[volumeId]->put(id, data, type);
 	}
 
-	int Pool::getMetas(const uint32_t &volumeId, const uint64_t &id, blockInfo_t &metas, const queryType type) {
+	int Pool::getMetas(const uint32_t &volumeId, const uint64_t &id, blockInfo_t &metas, const blockType type) {
 		return this->volumes[volumeId]->getMetas(id, metas, type);
 	}
 
-	int Pool::putMetas(const uint32_t &volumeId, const uint64_t &id, const blockInfo_t &metas, const queryType type) {
+	int Pool::putMetas(const uint32_t &volumeId, const uint64_t &id, const blockInfo_t &metas, const blockType type) {
 		return this->volumes[volumeId]->putMetas(id, metas, type);
 	}
 
@@ -162,16 +163,32 @@ namespace mtfs {
 		return 0;
 	}
 
-	void Pool::doMigration() {
+	void
+	Pool::doMigration(std::map<ident_t, ident_t> &movedBlk, std::vector<ident_t> &unsatisfyBlk, const blockType type) {
 		for (auto &&volume :this->volumes) {
 			Logger::getInstance()->log("Pool.doMigration", "do migration for volume: " + to_string(volume.first),
 									   Logger::L_DEBUG);
 			vector<blockInfo_t> unsatisfy;
 			unsatisfy.clear();
-			volume.second->getUnsatisfy(unsatisfy, DATA_BLOCK);
+			volume.second->getUnsatisfy(unsatisfy, type);
 
-			for (auto &&blk :unsatisfy) {
-				blk.id.volumeId = volume.first;
+			for (auto &&blkInfos :unsatisfy) {
+				ident_t oldIdent(blkInfos.id.id, volume.first);
+				blkInfos.id.volumeId = volume.first;
+
+				ruleInfo_t info = ruleInfo_t();
+				info.lastAccess = blkInfos.lastAccess;
+
+				vector<uint32_t> newVolumes;
+				this->getValidVolumes(info, newVolumes);
+
+				ident_t newIdent(0, newVolumes.front());
+				this->volumes[newIdent.volumeId]->add(newIdent.id, type);
+
+				uint8_t datas[this->blockSize];
+				this->volumes[oldIdent.volumeId]->get(oldIdent.id, datas, type);
+
+				this->volumes[newIdent.volumeId]->put(newIdent.id, datas, type);
 			}
 
 			unsigned long nb = unsatisfy.size();

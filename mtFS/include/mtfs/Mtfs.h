@@ -47,11 +47,6 @@ namespace mtfs {
 		static const int SUCCESS = 0;
 		static const int PENDING = 9999;
 
-		enum blockType {
-			DIR,
-			DATA,
-		};
-
 		static Mtfs *instance;
 		static boost::threadpool::pool *threadPool;
 		static std::string systemName;
@@ -144,7 +139,7 @@ namespace mtfs {
 
 		void dlInodes(dl_st *src, dl_st *dst);
 
-		void initMetas(const internalInode_st &parentInode, const std::vector<ident_t> ids, const queryType type,
+		void initMetas(const internalInode_st &parentInode, const std::vector<ident_t> ids, const blockType type,
 					   boost::threadpool::pool *thPool = nullptr);
 
 //

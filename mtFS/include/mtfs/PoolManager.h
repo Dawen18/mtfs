@@ -14,6 +14,7 @@
 
 namespace mtfs {
 	class Pool;
+
 	class Acces;
 
 	class PoolManager : public Acces {
@@ -50,29 +51,29 @@ namespace mtfs {
 
 		int addPool(uint32_t poolId, Pool *pool, Rule *rule);
 
-		int add(const ruleInfo_t &info, std::vector<ident_t> &ids, const queryType type, const size_t nb) override;
+		int add(const ruleInfo_t &info, std::vector<ident_t> &ids, const blockType type, const size_t nb) override;
 
-		int del(const ident_t &id, const queryType type) override;
+		int del(const ident_t &id, const blockType type) override;
 
-		int get(const ident_t &id, void *data, const queryType type) override;
+		int get(const ident_t &id, void *data, const blockType type) override;
 
-		int put(const ident_t &id, const void *data, const queryType type) override;
+		int put(const ident_t &id, const void *data, const blockType type) override;
 
-		int getMetas(const ident_t &id, blockInfo_t &metas, const queryType type) override;
+		int getMetas(const ident_t &id, blockInfo_t &metas, const blockType type) override;
 
-		int putMetas(const ident_t &id, const blockInfo_t &metas, const queryType type) override;
+		int putMetas(const ident_t &id, const blockInfo_t &metas, const blockType type) override;
 
-		void doMigration();
+		void doMigration(const blockType type);
 
 	private:
 
-		bool isLocked(const ident_t &id, const queryType &type);
+		bool isLocked(const ident_t &id, const blockType &type);
 
-		bool lock(const ident_t &id, const queryType &type);
+		bool lock(const ident_t &id, const blockType &type);
 
-		bool unlock(const ident_t &id, const queryType &type);
+		bool unlock(const ident_t &id, const blockType &type);
 
-		bool hasMoved(const ident_t &id, ident_t &newId, const queryType &type);
+		bool hasMoved(const ident_t &id, ident_t &newId, const blockType &type);
 
 		int getValidPools(const ruleInfo_t &info, std::vector<uint32_t> &poolIds);
 

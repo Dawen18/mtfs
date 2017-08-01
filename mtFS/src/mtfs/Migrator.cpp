@@ -26,8 +26,12 @@ void mtfs::Migrator::main(info_st *infos) {
 		lk.unlock();
 
 //		Do migration;
-		Logger::getInstance()->log("MIGRATOR", "start migration", Logger::L_DEBUG);
-		infos->poolManager->doMigration();
+		Logger::getInstance()->log("MIGRATOR", "start inode migration", Logger::L_DEBUG);
+		infos->poolManager->doMigration(blockType::INODE);
+		Logger::getInstance()->log("MIGRATOR", "start dirblock migration", Logger::L_DEBUG);
+		infos->poolManager->doMigration(blockType::DIR_BLOCK);
+		Logger::getInstance()->log("MIGRATOR", "start datablock migration", Logger::L_DEBUG);
+		infos->poolManager->doMigration(blockType::DATA_BLOCK);
 		Logger::getInstance()->log("MIGRATOR", "end migration", Logger::L_DEBUG);
 
 		lk.lock();

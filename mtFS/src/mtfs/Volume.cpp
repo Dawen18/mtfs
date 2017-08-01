@@ -79,8 +79,7 @@ namespace mtfs {
 		}
 	}
 
-
-	int Volume::add(uint64_t &id, const queryType type) {
+	int Volume::add(uint64_t &id, const blockType type) {
 		int ret;
 		switch (type) {
 			case INODE:
@@ -100,7 +99,7 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Volume::add(std::vector<uint64_t> &ids, const int nb, const queryType type) {
+	int Volume::add(std::vector<uint64_t> &ids, const int nb, const blockType type) {
 		boost::threadpool::pool thPool((size_t) nb);
 
 		vector<uint64_t *> tmp;
@@ -133,7 +132,7 @@ namespace mtfs {
 		return 0;
 	}
 
-	int Volume::del(const uint64_t &id, const queryType type) {
+	int Volume::del(const uint64_t &id, const blockType type) {
 		int ret;
 
 		switch (type) {
@@ -155,7 +154,7 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Volume::get(const uint64_t &id, void *data, queryType type) {
+	int Volume::get(const uint64_t &id, void *data, blockType type) {
 		int ret;
 
 		switch (type) {
@@ -179,7 +178,7 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Volume::put(const uint64_t &id, const void *data, queryType type) {
+	int Volume::put(const uint64_t &id, const void *data, blockType type) {
 		int ret;
 
 		switch (type) {
@@ -202,23 +201,41 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Volume::getMetas(const uint64_t &id, blockInfo_t &metas, queryType type) {
+	int Volume::getMetas(const uint64_t &id, blockInfo_t &metas, blockType type) {
+		int ret;
+
+		map<uint64_t, uint64_t> *access = nullptr;
+		mutex *mu;
 		switch (type) {
 			case INODE:
-				return this->plugin->getInodeMetas(id, metas);
+				ret = this->plugin->getInodeMetas(id, metas);
+				mu = &this->iaMutex;
+				access = &this->inodesAccess;
 				break;
 			case DIR_BLOCK:
-				return this->plugin->getDirBlockMetas(id, metas);
+				ret = this->plugin->getDirBlockMetas(id, metas);
+				mu = &this->daMutex;
+				access = &this->dirBlockAccess;
 				break;
 			case DATA_BLOCK:
-				return this->plugin->getBlockMetas(id, metas);
+				ret = this->plugin->getBlockMetas(id, metas);
+				mu = &this->baMutex;
+				access = &this->blocksAccess;
 				break;
 			default:
 				return ENOSYS;
 		}
+
+		unique_lock<mutex> lk(*mu);
+		if (access->end() == access->find(id))
+			(*access)[id] = metas.lastAccess;
+		else
+			metas.lastAccess = (*access)[id];
+
+		return ret;
 	}
 
-	int Volume::putMetas(const uint64_t &id, const blockInfo_t &metas, queryType type) {
+	int Volume::putMetas(const uint64_t &id, const blockInfo_t &metas, blockType type) {
 		switch (type) {
 			case INODE:
 				return this->plugin->putInodeMetas(id, metas);
@@ -234,44 +251,37 @@ namespace mtfs {
 		}
 	}
 
-	int Volume::getUnsatisfy(vector<blockInfo_t> &unsatisfy, const queryType &type, const int limit) {
-		int nb = 0;
-		if (this->isTimeVolume) {
-			vector<uint64_t> under;
-			this->getOutOfTime(under, type);
-
-			for (auto &&blk :under) {
-				blockInfo_t info = blockInfo_t();
-//				this->getMetas(blk, info, type);
-
-				unsatisfy.push_back(info);
-
-				nb++;
-				if (limit == nb)
-					return 0;
-			}
-		}
-
-		return 0;
-	}
-
-	bool Volume::updateLastAccess(const uint64_t &id, const queryType type) {
+	bool Volume::updateLastAccess(const uint64_t &id, const blockType type) {
 		map<uint64_t, uint64_t> *mp;
+		mutex *mu;
 		switch (type) {
 			case INODE:
+				mu = &this->iaMutex;
 				mp = &this->inodesAccess;
 				break;
 			case DIR_BLOCK:
+				mu = &this->daMutex;
 				mp = &this->dirBlockAccess;
 				break;
 			case DATA_BLOCK:
+				mu = &this->baMutex;
 				mp = &this->blocksAccess;
 				break;
 			default:
 				return false;
 		}
 
-		(*mp)[id] = (uint64_t) time(NULL);
+		blockInfo_t metas = blockInfo_t();
+		this->getMetas(id, metas, type);
+
+		uint64_t now = (uint64_t) time(NULL);
+		{
+			unique_lock<mutex> lk(*mu);
+			(*mp)[id] = now;
+		}
+
+		metas.lastAccess = now;
+		this->putMetas(id, metas, type);
 
 		return true;
 	}
@@ -288,26 +298,53 @@ namespace mtfs {
 		this->isTimeVolume = b;
 	}
 
-	int Volume::getOutOfTime(vector<uint64_t> &blocks, const queryType &type) {
+	int Volume::getUnsatisfy(vector<blockInfo_t> &unsatisfy, const blockType &type, const int limit) {
+		int nb = 0;
+		if (this->isTimeVolume) {
+			vector<uint64_t> under;
+			this->getOutOfTime(under, type);
+
+			for (auto &&blk :under) {
+				blockInfo_t info = blockInfo_t();
+				this->getMetas(blk, info, type);
+				info.id.id = blk;
+
+				unsatisfy.push_back(info);
+
+				nb++;
+				if (limit == nb)
+					return 0;
+			}
+		}
+
+		return 0;
+	}
+
+	int Volume::getOutOfTime(vector<uint64_t> &blocks, const blockType &type) {
 		uint64_t now = (uint64_t) time(NULL);
 		const uint64_t maxTimestamp = now - this->minDelay;
 		const uint64_t minTimestamp = 0 == this->maxDelay ? 0 : now - this->maxDelay;
 
 		map<uint64_t, uint64_t> *mp;
+		mutex *mu;
 		switch (type) {
 			case INODE:
+				mu = &this->iaMutex;
 				mp = &this->inodesAccess;
 				break;
 			case DIR_BLOCK:
+				mu = &this->daMutex;
 				mp = &this->dirBlockAccess;
 				break;
 			case DATA_BLOCK:
+				mu = &this->baMutex;
 				mp = &this->blocksAccess;
 				break;
 			default:
 				return ENOSYS;
 		}
 
+		unique_lock<mutex> lk(*mu);
 		for (auto &&item :*mp) {
 			if (!(maxTimestamp > item.second && minTimestamp < item.second))
 				blocks.push_back(item.first);

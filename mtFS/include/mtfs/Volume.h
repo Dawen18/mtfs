@@ -8,6 +8,7 @@
 #include <rapidjson/document.h>
 #include <mtfs/structs.h>
 #include <pluginSystem/Plugin.h>
+#include <mutex>
 
 namespace mtfs {
 	class Volume {
@@ -23,8 +24,11 @@ namespace mtfs {
 		uint64_t minDelay;
 		uint64_t maxDelay;
 
+		std::mutex iaMutex;
 		std::map<uint64_t, uint64_t> inodesAccess;
+		std::mutex daMutex;
 		std::map<uint64_t, uint64_t> dirBlockAccess;
+		std::mutex baMutex;
 		std::map<uint64_t, uint64_t> blocksAccess;
 
 
@@ -46,26 +50,26 @@ namespace mtfs {
 
 		Volume(pluginSystem::Plugin *plugin);
 
-		int add(uint64_t &id, const queryType type);
+		int add(uint64_t &id, const blockType type);
 
-		int add(std::vector<uint64_t> &ids, const int nb, const queryType type);
+		int add(std::vector<uint64_t> &ids, const int nb, const blockType type);
 
-		int del(const uint64_t &id, const queryType type);
+		int del(const uint64_t &id, const blockType type);
 
-		int get(const uint64_t &id, void *data, queryType type);
+		int get(const uint64_t &id, void *data, blockType type);
 
-		int put(const uint64_t &id, const void *data, queryType type);
+		int put(const uint64_t &id, const void *data, blockType type);
 
-		int getMetas(const uint64_t &id, blockInfo_t &metas, queryType type);
+		int getMetas(const uint64_t &id, blockInfo_t &metas, blockType type);
 
-		int putMetas(const uint64_t &id, const blockInfo_t &metas, queryType type);
+		int putMetas(const uint64_t &id, const blockInfo_t &metas, blockType type);
 
-		int getUnsatisfy(std::vector<blockInfo_t> &unsatisfy, const queryType &type, const int limit = INT_MAX);
+		int getUnsatisfy(std::vector<blockInfo_t> &unsatisfy, const blockType &type, const int limit = INT_MAX);
 
 	private:
-		int getOutOfTime(std::vector<uint64_t> &blocks, const queryType &type);
+		int getOutOfTime(std::vector<uint64_t> &blocks, const blockType &type);
 
-		bool updateLastAccess(const uint64_t &id, const queryType type);
+		bool updateLastAccess(const uint64_t &id, const blockType type);
 	};
 
 }  // namespace mtfs

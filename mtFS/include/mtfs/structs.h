@@ -38,7 +38,7 @@
 namespace mtfs {
 	class Rule;
 
-	enum queryType {
+	enum blockType {
 		INODE,
 		DIR_BLOCK,
 		DATA_BLOCK,
@@ -61,9 +61,10 @@ namespace mtfs {
 		std::uint32_t volumeId;
 		std::uint64_t id;
 
-		ident_st(std::uint64_t id = 0, std::uint32_t vid = 0, std::uint32_t pid = 0) : id(id),
+		explicit ident_st(std::uint64_t id = 0, std::uint32_t vid = 0, std::uint32_t pid = 0) : id(id),
 																					   volumeId(vid),
 																					   poolId(pid) {}
+		~ident_st() = default;
 
 		ident_st &operator=(const ident_st &id) {
 			this->poolId = id.poolId;

@@ -6,9 +6,9 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/prettywriter.h>
 #include <boost/filesystem.hpp>
+#include <utility>
 #include <grp.h>
 #include <pwd.h>
-#include <mtfs/structs.h>
 
 #define HOME "/home/david/Cours/4eme/Travail_bachelor/Home/"
 #define SYSTEMS_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Systems/"
@@ -29,25 +29,19 @@ namespace mtfs {
 	};
 
 	struct dl_st {
-		mutex *fifoMu;
-		Semaphore *sem;
+		mutex *fifoMu{nullptr};
+		Semaphore *sem{nullptr};
 		union {
 			queue<pair<string, inode_t>> *inodeQueue;
 			queue<dirBlock_t> *dirQueue;
 			queue<uint8_t *> *blkQueue;
 		} fifo;
-		bool end;
-		mutex *endMu;
-		pool *dlThPool;
+		bool end{false};
+		mutex *endMu{nullptr};
+		pool *dlThPool{nullptr};
 
-		dl_st() : fifoMu(nullptr), sem(nullptr), end(false), endMu(nullptr), dlThPool(nullptr) {
+		dl_st() {
 			fifo.inodeQueue = nullptr;
-		}
-
-		~dl_st() {
-//			delete fifoMu;
-//			delete sem;
-//			delete endMu;
 		}
 	};
 
@@ -57,14 +51,14 @@ namespace mtfs {
 			DIR,
 		};
 
-		bool firstCall;
+		bool firstCall{true};
 		bt blockT;
 		dl_st blkDl;
 		dl_st inoDl;
-		boost::thread *blkThr;
-		boost::thread *inoThr;
+		boost::thread *blkThr{nullptr};
+		boost::thread *inoThr{nullptr};
 
-		fd_st() : firstCall(true), blkDl(dl_st()), inoDl(dl_st()), blkThr(nullptr), inoThr(nullptr) {}
+		fd_st() : blkDl(dl_st()), inoDl(dl_st()) {}
 
 		~fd_st() {
 			switch (this->blockT) {
@@ -79,8 +73,8 @@ namespace mtfs {
 	};
 
 
-	Mtfs *Mtfs::instance = 0;
-	pool *Mtfs::threadPool = 0;
+	Mtfs *Mtfs::instance = nullptr;
+	pool *Mtfs::threadPool = nullptr;
 	string Mtfs::systemName;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,7 +82,7 @@ namespace mtfs {
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	Mtfs *Mtfs::getInstance() {
-		if (!instance)
+		if (instance == nullptr)
 			instance = new Mtfs();
 
 		return instance;
@@ -145,7 +139,7 @@ namespace mtfs {
 		inode.gid = 1001;
 		inode.size = 0;
 		inode.linkCount = 2;
-		inode.atime = (uint64_t) time(NULL);
+		inode.atime = (uint64_t) time(nullptr);
 		inode.referenceId.clear();
 		inode.dataBlocks.clear();
 
@@ -154,7 +148,7 @@ namespace mtfs {
 
 	bool Mtfs::start(Document &system, std::string homeDir, string sysName) {
 		(void) homeDir;
-		systemName = sysName;
+		systemName = std::move(sysName);
 
 		superblock_t superblock;
 		jsonToStruct(system, superblock);
@@ -162,7 +156,7 @@ namespace mtfs {
 		if (!getInstance()->build(superblock))
 			return false;
 
-		unsigned nbThread = (unsigned int) (thread::hardware_concurrency() * 1.25);
+		auto nbThread = (unsigned int) (thread::hardware_concurrency() * 1.25);
 		threadPool = new pool(nbThread);
 
 		return true;
@@ -242,7 +236,7 @@ namespace mtfs {
 		assert(d.HasMember(Pool::POOLS));
 		for (auto &&item :d[Pool::POOLS].GetObject()) {
 			string sId = item.name.GetString();
-			uint32_t id = (uint32_t) stoul(sId);
+			auto id = (uint32_t) stoul(sId);
 			pool_t pool;
 			memset(&pool, 0, sizeof(pool_t));
 			pool.volumes.clear();
@@ -314,7 +308,7 @@ namespace mtfs {
 		if (nullptr == inode)
 			return (void) fuse_reply_err(req, ENOENT);
 
-		struct stat st;
+		struct stat st{};
 		this->buildStat(*inode, st);
 
 		fuse_reply_attr(req, &st, this->ATTR_TIMEOUT);
@@ -345,7 +339,7 @@ namespace mtfs {
 
 		pool upThPool(this->SIMULT_UP);
 		for (auto &&id: inInode->idents) {
-			upThPool.schedule(bind(&Acces::put, this->inodes, id, &inInode->inode, queryType::INODE));
+			upThPool.schedule(bind(&Acces::put, this->inodes, id, &inInode->inode, INODE));
 		}
 	}
 
@@ -362,21 +356,21 @@ namespace mtfs {
 		blkDl.fifo.dirQueue = new queue<dirBlock_t>();
 		blkDl.endMu = new mutex;
 
-		this->dlBlocks(parentInode->inode, &blkDl, DIR, 0);
+		this->dlBlocks(parentInode->inode, &blkDl, blockType::DIR_BLOCK, 0);
 
 		vector<ident_t> inodeIds;
 
 		unique_lock<mutex> endLk(*blkDl.endMu, defer_lock);
 		unique_lock<mutex> fifoLk(*blkDl.fifoMu, defer_lock);
 		lock(endLk, fifoLk);
-		while (!(blkDl.end && 0 == blkDl.fifo.dirQueue->size())) {
+		while (!(blkDl.end && blkDl.fifo.dirQueue->empty())) {
 			endLk.unlock();
 			fifoLk.unlock();
 
 			blkDl.sem->wait();
 
 			lock(endLk, fifoLk);
-			if (blkDl.end && 0 == blkDl.fifo.dirQueue->size())
+			if (blkDl.end && blkDl.fifo.dirQueue->empty())
 				break;
 			endLk.unlock();
 
@@ -400,17 +394,17 @@ namespace mtfs {
 
 
 //		TODO Doit être un pointeur car lookup avant open donc inode doit être en mémoire.
-		internalInode_st *inode = new internalInode_st();
+		auto *inode = new internalInode_st();
 		inode->idents = inodeIds;
 		int ret;
 
-		if (0 == inodeIds.size()) {
+		if (inodeIds.empty()) {
 			fuse_reply_err(req, ENOENT);
 			return;
 		}
 
 		do {
-			ret = this->inodes->get(inodeIds.back(), &inode->inode, queryType::INODE);
+			ret = this->inodes->get(inodeIds.back(), &inode->inode, blockType::INODE);
 			inodeIds.pop_back();
 			if (inodeIds.empty())
 				break;
@@ -456,7 +450,7 @@ namespace mtfs {
 		}
 
 		pool mPool(SIMULT_UP);
-		this->initMetas(*parentInode, inodeIdents, queryType::DIR_BLOCK, &mPool);
+		this->initMetas(*parentInode, inodeIdents, blockType::DIR_BLOCK, &mPool);
 
 //			Add entry in dir
 		if (0 != (ret = this->addEntry(parentInode, name, inodeIdents))) {
@@ -466,7 +460,7 @@ namespace mtfs {
 		}
 
 //			reply to fuse
-		fuse_entry_param param;
+		fuse_entry_param param{};
 		memset(&param, 0, sizeof(fuse_entry_param));
 
 		this->buildParam(*inode, param);
@@ -489,7 +483,7 @@ namespace mtfs {
 		}
 
 		pool mPool(SIMULT_UP);
-		this->initMetas(*parentInode, inodeIdents, queryType::DIR_BLOCK, &mPool);
+		this->initMetas(*parentInode, inodeIdents, blockType::DIR_BLOCK, &mPool);
 
 //			Add entry in dir
 		if (0 != (ret = this->addEntry(parentInode, name, inodeIdents))) {
@@ -499,7 +493,7 @@ namespace mtfs {
 		}
 
 //			reply to fuse
-		fuse_entry_param param;
+		fuse_entry_param param{};
 		memset(&param, 0, sizeof(fuse_entry_param));
 
 		this->buildParam(*inode, param);
@@ -539,20 +533,20 @@ namespace mtfs {
 			} else {
 
 //			get all user groups;
-				size_t bufsize = (size_t) sysconf(_SC_GETPW_R_SIZE_MAX);
+				auto bufsize = (size_t) sysconf(_SC_GETPW_R_SIZE_MAX);
 				if (bufsize == -1)
 					bufsize = 16384;
 
-				char *buf = (char *) malloc(bufsize * sizeof(char));
-				if (buf == NULL) {
+				auto *buf = (char *) malloc(bufsize * sizeof(char));
+				if (nullptr == buf) {
 					fuse_reply_err(req, ENOMEM);
 					free(buf);
 					return;
 				}
 
-				struct passwd pwd, *result;
+				struct passwd pwd{}, *result;
 				int s = getpwuid_r(context->uid, &pwd, buf, bufsize, &result);
-				if (NULL == result) {
+				if (nullptr == result) {
 					int err;
 					if (0 == s)
 						err = EAGAIN;
@@ -564,7 +558,7 @@ namespace mtfs {
 				}
 
 				int ngroups = GROUPS_TO_SEARCH;
-				gid_t *groups = (gid_t *) malloc(ngroups * sizeof(gid_t));
+				auto *groups = (gid_t *) malloc(ngroups * sizeof(gid_t));
 				if (getgrouplist(pwd.pw_name, pwd.pw_gid, groups, &ngroups) == -1) {
 					cerr << "get group list error. ngoups " << ngroups << endl;
 					free(buf);
@@ -598,12 +592,12 @@ namespace mtfs {
 //		if (!inode->inode.dataBlocks.empty()) {
 //			uint8_t *firstBlock = (uint8_t *) malloc(this->blockSize * sizeof(uint8_t));
 //
-//			this->blocks->get(inode->inode.dataBlocks.front().front(), &firstBlock, queryType::DATA_BLOCK);
+//			this->blocks->get(inode->inode.dataBlocks.front().front(), &firstBlock, blockType::DATA_BLOCK);
 //			fi->fh = (uint64_t) firstBlock;
 //		} else
 //			fi->fh = 0;A
 
-		fd_st *fd = new fd_st();
+		auto *fd = new fd_st();
 		fd->blockT = fd->DATA;
 		fd->blkDl.dlThPool = new pool(this->SIMULT_DL);
 		fd->blkDl.sem = new Semaphore();
@@ -631,7 +625,7 @@ namespace mtfs {
 
 		internalInode_st *intInode = this->getIntInode(ino);
 
-		fd_st *fd = new fd_st();
+		auto *fd = new fd_st();
 		fd->blockT = fd->DIR;
 		fd->blkDl.dlThPool = new pool(this->SIMULT_DL);
 		fd->blkDl.sem = new Semaphore();
@@ -667,7 +661,7 @@ namespace mtfs {
 	void Mtfs::releasedir(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
 		(void) ino;
 
-		fd_st *fd = (fd_st *) fi->fh;
+		auto *fd = (fd_st *) fi->fh;
 		delete fd;
 		fi->fh = 0;
 
@@ -687,13 +681,13 @@ namespace mtfs {
 	void Mtfs::write_buf(fuse_req_t req, fuse_ino_t ino, fuse_bufvec *bufv, off_t off, fuse_file_info *fi) {
 		int ret = 0;
 
-		fd_st *fd = (fd_st *) fi->fh;
+		auto *fd = (fd_st *) fi->fh;
 
 		internalInode_st *inode = this->getIntInode(ino);
 
 		size_t size = bufv->buf[0].size;
-		int firstBlock = (int) (off / this->blockSize);
-		int lastBlock = (int) ((off + size - 1) / this->blockSize);
+		auto firstBlock = (int) (off / this->blockSize);
+		auto lastBlock = (int) ((off + size - 1) / this->blockSize);
 
 		ruleInfo_t newBlockInfo = ruleInfo_st();
 		newBlockInfo.gid = inode->inode.gid;
@@ -708,26 +702,26 @@ namespace mtfs {
 		vector<uint64_t> toFree;
 
 		for (int blockToWrite = firstBlock; blockToWrite <= lastBlock; ++blockToWrite) {
-			uint8_t *block = (uint8_t *) calloc(sizeof(uint8_t), this->blockSize);
+			auto *block = (uint8_t *) calloc(sizeof(uint8_t), this->blockSize);
 			memset(block, 0, this->blockSize);
 
 			vector<ident_t> blockIdents;
-			if (0 == inode->inode.dataBlocks.size() || inode->inode.dataBlocks.size() <= blockToWrite) {
+			if (inode->inode.dataBlocks.empty() || inode->inode.dataBlocks.size() <= blockToWrite) {
 				if (SUCCESS !=
-					(ret = this->blocks->add(newBlockInfo, blockIdents, queryType::DATA_BLOCK,
+					(ret = this->blocks->add(newBlockInfo, blockIdents, blockType::DATA_BLOCK,
 											 (const int) this->redundancy))) {
 					fuse_reply_err(req, ret);
 					return;
 				}
 
-				this->initMetas(*inode, blockIdents, queryType::DATA_BLOCK, &metasTp);
+				this->initMetas(*inode, blockIdents, blockType::DATA_BLOCK, &metasTp);
 
 				inode->inode.dataBlocks.push_back(blockIdents);
 			} else {
 				blockIdents = inode->inode.dataBlocks[blockToWrite];
 
 				for (auto &&id: blockIdents) {
-					ret = this->blocks->get(id, block, queryType::DATA_BLOCK);
+					ret = this->blocks->get(id, block, blockType::DATA_BLOCK);
 					if (SUCCESS == ret)
 						break;
 				}
@@ -736,20 +730,20 @@ namespace mtfs {
 			}
 
 			size_t startPos = blockToWrite == firstBlock ? off % this->blockSize : 0;
-			size_t endPos = blockToWrite == lastBlock ? rem % (this->blockSize + 1) : this->blockSize;
+			size_t endPos = (blockToWrite == lastBlock ? rem % (this->blockSize + 1) : this->blockSize) - startPos;
 
 			memcpy(block + startPos, bufv->buf->mem, endPos);
 			write += endPos;
 			rem -= endPos;
 
 			for (auto &&id: blockIdents) {
-				fd->blkDl.dlThPool->schedule(bind(&Acces::put, this->blocks, id, block, queryType::DATA_BLOCK));
+				fd->blkDl.dlThPool->schedule(bind(&Acces::put, this->blocks, id, block, blockType::DATA_BLOCK));
 			}
 
 			toFree.push_back((uint64_t) block);
 		}
 
-		uint8_t *data = (uint8_t *) malloc(size * sizeof(uint8_t));
+		auto *data = (uint8_t *) malloc(size * sizeof(uint8_t));
 		memcpy(data, bufv->buf[0].mem, bufv->buf[0].size);
 
 		inode->inode.size = off + size;
@@ -757,8 +751,8 @@ namespace mtfs {
 //		TODO supprimer les block en trop.
 		vector<ident_t> toDel;
 		if (inode->inode.dataBlocks.size() > lastBlock + 1) {
-			for (auto blks = inode->inode.dataBlocks.begin(); blks != inode->inode.dataBlocks.end(); blks++) {
-				for (auto &&id: *blks) {
+			for (auto &dataBlock : inode->inode.dataBlocks) {
+				for (auto &&id: dataBlock) {
 					toDel.push_back(id);
 				}
 			}
@@ -768,7 +762,7 @@ namespace mtfs {
 		}
 
 		for (auto &&id: inode->idents) {
-			fd->inoDl.dlThPool->schedule(bind(&Acces::put, this->inodes, id, &inode->inode, queryType::INODE));
+			fd->inoDl.dlThPool->schedule(bind(&Acces::put, this->inodes, id, &inode->inode, blockType::INODE));
 		}
 
 		fd->blkDl.dlThPool->wait();
@@ -778,7 +772,7 @@ namespace mtfs {
 
 		pool delPool(this->redundancy);
 		for (auto &&id: toDel) {
-			delPool.schedule(bind(&Acces::del, this->blocks, id, queryType::DATA_BLOCK));
+			delPool.schedule(bind(&Acces::del, this->blocks, id, blockType::DATA_BLOCK));
 		}
 
 		for (auto &&ptr: toFree) {
@@ -792,18 +786,20 @@ namespace mtfs {
 
 
 		size = min(size, inode->inode.size);
-		int firstBlock = (int) (off / this->blockSize);
-		int lastBlock = (int) ((off + size - 1) / this->blockSize);
+		int firstBlock, lastBlock;
+		firstBlock = (int) (off / this->blockSize);
+		lastBlock = (int) ((off + size - 1) / this->blockSize);
 
 		size_t rem = size;
 		size_t read = 0;
 
-		char *buf = new char[size];
+		char *buf;
+		buf = new char[size];
 		char *p = buf;
 
 		for (int blockToRead = firstBlock; blockToRead <= lastBlock; blockToRead++) {
 			uint8_t block[this->blockSize];
-			if (SUCCESS != this->blocks->get(inode->inode.dataBlocks[blockToRead][0], block, queryType::DATA_BLOCK)) {
+			if (SUCCESS != this->blocks->get(inode->inode.dataBlocks[blockToRead][0], block, blockType::DATA_BLOCK)) {
 				delete[]buf;
 				fuse_reply_err(req, EAGAIN);
 
@@ -849,9 +845,11 @@ namespace mtfs {
 
 		pluginSystem::PluginManager *manager = pluginSystem::PluginManager::getInstance();
 
-		PoolManager *poolManager = new PoolManager();
+		PoolManager *poolManager;
+		poolManager = new PoolManager();
 		for (auto &&poolSt: superblock.pools) {
-			Pool *pool = new Pool();
+			Pool *pool;
+			pool = new Pool(this->blockSize);
 
 			for (auto volSt: poolSt.second.volumes) {
 				volSt.second.params.insert(make_pair("home", PLUGIN_HOME));
@@ -971,21 +969,21 @@ namespace mtfs {
 		pool mPool(SIMULT_UP);
 
 //		if directory is empty add one block
-		if (parentInode->inode.dataBlocks.size() == 0) {
+		if (parentInode->inode.dataBlocks.empty()) {
 			if (0 !=
-				(ret = this->dirBlocks->add(getRuleInfo(parentInode->inode), blockIdents, queryType::DIR_BLOCK,
+				(ret = this->dirBlocks->add(getRuleInfo(parentInode->inode), blockIdents, blockType::DIR_BLOCK,
 											this->redundancy))) {
 				return ret;
 			}
 
 			dirBlock.entries.clear();
 
-			this->initMetas(*parentInode, blockIdents, queryType::DIR_BLOCK, &mPool);
+			this->initMetas(*parentInode, blockIdents, blockType::DIR_BLOCK, &mPool);
 
 			parentInode->inode.atime = this->now();
 			parentInode->inode.dataBlocks.push_back(blockIdents);
 			for (auto &&ident: parentInode->idents) {
-				iPool.schedule(bind(&Acces::put, this->inodes, ident, &parentInode->inode, queryType::INODE));
+				iPool.schedule(bind(&Acces::put, this->inodes, ident, &parentInode->inode, blockType::INODE));
 			}
 			if (parentInode == this->rootIn)
 				this->writeRootInode();
@@ -995,7 +993,7 @@ namespace mtfs {
 			blockIdents = parentInode->inode.dataBlocks.back();
 
 			for (int i = 0; i < blockIdents.size(); ++i) {
-				if (0 == (ret = this->dirBlocks->get(blockIdents[i], &dirBlock, queryType::DIR_BLOCK)))
+				if (0 == (ret = this->dirBlocks->get(blockIdents[i], &dirBlock, blockType::DIR_BLOCK)))
 					break;
 			}
 
@@ -1008,18 +1006,18 @@ namespace mtfs {
 		if (this->maxEntryPerBlock == dirBlock.entries.size()) {
 			ruleInfo_t info = getRuleInfo(parentInode->inode);
 			info.lastAccess = this->now();
-			if (0 != (ret = this->dirBlocks->add(info, blockIdents, queryType::DIR_BLOCK, this->redundancy))) {
+			if (0 != (ret = this->dirBlocks->add(info, blockIdents, blockType::DIR_BLOCK, this->redundancy))) {
 				return ret;
 			}
 
-			this->initMetas(*parentInode, blockIdents, queryType::DIR_BLOCK, &mPool);
+			this->initMetas(*parentInode, blockIdents, blockType::DIR_BLOCK, &mPool);
 
 			dirBlock.entries.clear();
 
 			parentInode->inode.atime = this->now();
 			parentInode->inode.dataBlocks.push_back(blockIdents);
 			for (auto &&ident: parentInode->idents) {
-				iPool.schedule(bind(&Acces::put, this->inodes, ident, &parentInode->inode, queryType::INODE));
+				iPool.schedule(bind(&Acces::put, this->inodes, ident, &parentInode->inode, blockType::INODE));
 			}
 			if (parentInode == this->rootIn)
 				this->writeRootInode();
@@ -1031,7 +1029,7 @@ namespace mtfs {
 		pool wpool(blockIdents.size());
 		for (auto &&ident: blockIdents) {
 //			TODO try again if block not write.
-			wpool.schedule(bind(&Acces::put, this->dirBlocks, ident, &dirBlock, queryType::DIR_BLOCK));
+			wpool.schedule(bind(&Acces::put, this->dirBlocks, ident, &dirBlock, blockType::DIR_BLOCK));
 		}
 
 		return 0;
@@ -1051,7 +1049,7 @@ namespace mtfs {
 		int ret;
 
 //		get new inode idents
-		if (0 != (ret = this->inodes->add(this->getRuleInfo(inode), idents, queryType::INODE, this->redundancy))) {
+		if (0 != (ret = this->inodes->add(this->getRuleInfo(inode), idents, blockType::INODE, this->redundancy))) {
 			return ret;
 		}
 
@@ -1059,7 +1057,7 @@ namespace mtfs {
 		{
 			pool thPool(idents.size());
 			for (auto &&ident: idents) {
-				thPool.schedule(bind(&Acces::put, this->inodes, ident, &inode, queryType::INODE));
+				thPool.schedule(bind(&Acces::put, this->inodes, ident, &inode, blockType::INODE));
 			}
 		}
 
@@ -1080,11 +1078,11 @@ namespace mtfs {
 		if (firstBlockIdx < inode.dataBlocks.size()) {
 			for (auto idents = inode.dataBlocks.begin() + firstBlockIdx; idents != inode.dataBlocks.end(); idents++) {
 				switch (type) {
-					case DIR:
+					case DIR_BLOCK:
 						dlSt->dlThPool->schedule(
 								bind(&Mtfs::dlDirBlocks, this, *idents, dlSt->fifo.dirQueue, dlSt->fifoMu, dlSt->sem));
 						break;
-					case DATA:
+					case DATA_BLOCK:
 						break;
 					default:
 //					TODO Log error
@@ -1117,7 +1115,7 @@ namespace mtfs {
 		dirBlock_t db = dirBlock_t();
 
 		for (auto &&id: ids) {
-			ret = this->dirBlocks->get(id, &db, queryType::DIR_BLOCK);
+			ret = this->dirBlocks->get(id, &db, blockType::DIR_BLOCK);
 			if (SUCCESS == ret)
 				break;
 		}
@@ -1140,14 +1138,14 @@ namespace mtfs {
 		unique_lock<mutex> srcEndLk(*src->endMu, defer_lock);
 		unique_lock<mutex> srcFifoLk(*src->fifoMu, defer_lock);
 		std::lock(srcEndLk, srcFifoLk);
-		while (!(src->end && 0 == src->fifo.dirQueue->size())) {
+		while (!(src->end && src->fifo.dirQueue->empty())) {
 			srcEndLk.unlock();
 			srcFifoLk.unlock();
 
 			src->sem->wait();
 
 			std::lock(srcEndLk, srcFifoLk);
-			if (src->end && 0 == src->fifo.dirQueue->size())
+			if (src->end && src->fifo.dirQueue->empty())
 				break;
 			srcEndLk.unlock();
 
@@ -1182,7 +1180,7 @@ namespace mtfs {
 		inode_t in = inode_t();
 
 		for (auto &&id: ids) {
-			ret = this->inodes->get(id, &in, queryType::INODE);
+			ret = this->inodes->get(id, &in, blockType::INODE);
 			if (SUCCESS == ret)
 				break;
 		}
@@ -1197,20 +1195,21 @@ namespace mtfs {
 	internalInode_st *Mtfs::getIntInode(fuse_ino_t ino) {
 		if (FUSE_ROOT_ID == ino)
 			return this->rootIn;
-		else
-			return (internalInode_st *) ino;
+
+		return (internalInode_st *) ino;
 	}
 
 	void Mtfs::doReaddir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, fuse_file_info *fi, const bool &plus) {
 		(void) off;
 		internalInode_st *inode = this->getIntInode(ino);
-		fd_st *fd = (fd_st *) fi->fh;
+		fd_st *fd;
+		fd = (fd_st *) fi->fh;
 
 		char *buf, *p;
 		size_t rem, currSize;
 
 		buf = (char *) calloc(size, 1);
-		if (NULL == buf)
+		if (nullptr == buf)
 			return (void) fuse_reply_err(req, ENOMEM);
 
 		p = buf;
@@ -1226,7 +1225,8 @@ namespace mtfs {
 
 //			Dl other blocks and inodes
 			int idx = this->INIT_DL;
-			fd->blkThr = new boost::thread(bind(&Mtfs::dlBlocks, this, inode->inode, &fd->blkDl, DIR, idx));
+			fd->blkThr = new boost::thread(
+					bind(&Mtfs::dlBlocks, this, inode->inode, &fd->blkDl, blockType::DIR_BLOCK, idx));
 
 			fd->inoDl.fifoMu = new mutex();
 			fd->inoDl.endMu = new mutex();
@@ -1239,16 +1239,17 @@ namespace mtfs {
 		unique_lock<mutex> inoEndLock(*fd->inoDl.endMu, defer_lock);
 		unique_lock<mutex> inoFifoLock(*fd->inoDl.fifoMu, defer_lock);
 		lock(inoEndLock, inoFifoLock);
-		while (!(fd->inoDl.end && 0 == fd->inoDl.fifo.inodeQueue->size())) {
+		while (!(fd->inoDl.end && fd->inoDl.fifo.inodeQueue->empty())) {
 			inoEndLock.unlock();
 			inoFifoLock.unlock();
 
 			fd->inoDl.sem->wait();
 
-			internalInode_st *intInode = new internalInode_st();
+			internalInode_st *intInode;
+			intInode = new internalInode_st();
 //			shared_ptr<internalInode_st> intInode(new internalInode_st());
 			lock(inoEndLock, inoFifoLock);
-			if (fd->inoDl.end && 0 == fd->inoDl.fifo.inodeQueue->size())
+			if (fd->inoDl.end && fd->inoDl.fifo.inodeQueue->empty())
 				break;
 			inoEndLock.unlock();
 
@@ -1282,17 +1283,18 @@ namespace mtfs {
 		size_t entSize = 0;
 
 		if (plus) {
-			fuse_entry_param *p = new fuse_entry_param();
+			fuse_entry_param *p;
+			p = new fuse_entry_param();
 			buildParam(inode, *p);
 
-			entSize += fuse_add_direntry_plus(req, NULL, 0, name.c_str(), NULL, 0);
+			entSize += fuse_add_direntry_plus(req, nullptr, 0, name.c_str(), nullptr, 0);
 			fuse_add_direntry_plus(req, buf, entSize, name.c_str(), p, currentSize + entSize);
 		} else {
-			struct stat stbuf;
+			struct stat stbuf{};
 			memset(&stbuf, 0, sizeof(stbuf));
 			buildStat(inode, stbuf);
 
-			entSize += fuse_add_direntry(req, NULL, 0, name.c_str(), NULL, 0);
+			entSize += fuse_add_direntry(req, nullptr, 0, name.c_str(), nullptr, 0);
 			fuse_add_direntry(req, buf, entSize, name.c_str(), &stbuf, currentSize + entSize);
 		}
 		return entSize;
@@ -1326,11 +1328,12 @@ namespace mtfs {
 	}
 
 	ruleInfo_t Mtfs::getRuleInfo(const inode_t &inode) {
-		return mtfs::ruleInfo_t(inode.uid, inode.gid, inode.atime);
+		return {inode.uid, inode.gid, inode.atime};
 	}
 
 	internalInode_st *Mtfs::newInode(const mode_t &mode, const fuse_ctx *ctx) {
-		internalInode_st *inode = new internalInode_st();
+		internalInode_st *inode;
+		inode = new internalInode_st();
 
 		inode->inode.accesRight = mode;
 		inode->inode.uid = ctx->uid;
@@ -1342,37 +1345,39 @@ namespace mtfs {
 	}
 
 	uint64_t Mtfs::now() {
-		return (uint64_t) time(NULL);
+		return (uint64_t) time(nullptr);
 	}
 
-	void Mtfs::initMetas(const internalInode_st &parentInode, const std::vector<ident_t> ids, const queryType type,
+	void Mtfs::initMetas(const internalInode_st &parentInode, const std::vector<ident_t> ids, const blockType type,
 						 boost::threadpool::pool *thPool) {
 		blockInfo_t metas = blockInfo_t();
-		metas.lastAccess = (uint64_t) time(NULL);
+		metas.lastAccess = (uint64_t) time(nullptr);
 		metas.referenceId = parentInode.idents;
 
-//		for (auto &&id :ids) {
-//			switch (type) {
-//				case INODE:
-//					if (nullptr != thPool)
-//						thPool->schedule(bind(&Acces::putMetas, this->inodes, id, metas, type));
-//					else
-//						this->inodes->putMetas(id, metas, type);
-//					break;
-//				case DIR_BLOCK:
-//					if (nullptr != thPool)
-//						thPool->schedule(bind(&Acces::putMetas, this->dirBlocks, id, metas, type));
-//					else
-//						this->dirBlocks->putMetas(id, metas, type);
-//					break;
-//				case DATA_BLOCK:
-//					if (nullptr != thPool)
-//						thPool->schedule(bind(&Acces::putMetas, this->blocks, id, metas, type));
-//					else
-//						this->blocks->putMetas(id, metas, type);
-//					break;
-//			}
-//		}
+		for (auto &&id :ids) {
+			metas.id = id;
+
+			switch (type) {
+				case INODE:
+					if (nullptr != thPool)
+						thPool->schedule(bind(&Acces::putMetas, this->inodes, id, metas, type));
+					else
+						this->inodes->putMetas(id, metas, type);
+					break;
+				case DIR_BLOCK:
+					if (nullptr != thPool)
+						thPool->schedule(bind(&Acces::putMetas, this->dirBlocks, id, metas, type));
+					else
+						this->dirBlocks->putMetas(id, metas, type);
+					break;
+				case DATA_BLOCK:
+					if (nullptr != thPool)
+						thPool->schedule(bind(&Acces::putMetas, this->blocks, id, metas, type));
+					else
+						this->blocks->putMetas(id, metas, type);
+					break;
+			}
+		}
 	}
 
 	int Mtfs::doUnlink(internalInode_st *parent, const std::string name) {
@@ -1380,7 +1385,7 @@ namespace mtfs {
 		for (auto &&dBlkIds :parent->inode.dataBlocks) {
 			dirBlock_t dBlk = dirBlock_t();
 
-			this->dirBlocks->get(dBlkIds.front(), &dBlk, queryType::DIR_BLOCK);
+			this->dirBlocks->get(dBlkIds.front(), &dBlk, blockType::DIR_BLOCK);
 
 			if (dBlk.entries.end() != dBlk.entries.find(name))
 				return this->delEntry(dBlkIds, dBlk, name);
@@ -1392,7 +1397,7 @@ namespace mtfs {
 		vector<ident_t> inodeIds = blk.entries.find(name)->second;
 
 		inode_t inode = inode_t();
-		this->inodes->get(inodeIds.front(), &inode, queryType::INODE);
+		this->inodes->get(inodeIds.front(), &inode, blockType::INODE);
 
 		if (0 < (inode.accesRight & S_IFDIR))
 			return EISDIR;
@@ -1401,17 +1406,17 @@ namespace mtfs {
 		pool upPool(SIMULT_UP);
 
 		for (auto &&id :ids) {
-			upPool.schedule(bind(&Acces::put, this->dirBlocks, id, &blk, queryType::DIR_BLOCK));
+			upPool.schedule(bind(&Acces::put, this->dirBlocks, id, &blk, blockType::DIR_BLOCK));
 		}
 
 		for (auto &&dataBlkIds :inode.dataBlocks) {
 			for (auto &&blkId :dataBlkIds) {
-				this->blocks->del(blkId, queryType::DATA_BLOCK);
+				this->blocks->del(blkId, blockType::DATA_BLOCK);
 			}
 		}
 
 		for (auto &&inodeId :inodeIds) {
-			this->inodes->del(inodeId, queryType::INODE);
+			this->inodes->del(inodeId, blockType::INODE);
 		}
 
 		return 0;
