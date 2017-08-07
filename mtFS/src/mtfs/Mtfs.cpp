@@ -9,6 +9,7 @@
 #include <utility>
 #include <grp.h>
 #include <pwd.h>
+#include <utils/Logger.h>
 
 #define HOME "/home/david/Cours/4eme/Travail_bachelor/Home/"
 #define SYSTEMS_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Systems/"
@@ -140,7 +141,6 @@ namespace mtfs {
 		inode.size = 0;
 		inode.linkCount = 2;
 		inode.atime = (uint64_t) time(nullptr);
-		inode.referenceId.clear();
 		inode.dataBlocks.clear();
 
 		return true;
@@ -344,7 +344,7 @@ namespace mtfs {
 	}
 
 	void Mtfs::lookup(fuse_req_t req, fuse_ino_t parent, const string name) {
-//		cout << "parent: " << parent << " name: " << name << endl;
+		Logger::getInstance()->log("LOOKUP", name, Logger::L_DEBUG);
 
 		internalInode_st *parentInode = this->getIntInode(parent);
 
@@ -902,8 +902,6 @@ namespace mtfs {
 
 		assert(d.HasMember(IN_ACCESS));
 		this->rootIn->inode.atime = d[IN_ACCESS].GetUint64();
-
-		this->rootIn->inode.referenceId.clear();
 
 		assert(d.HasMember(IN_BLOCKS));
 		for (auto &&item: d[IN_BLOCKS].GetArray()) {

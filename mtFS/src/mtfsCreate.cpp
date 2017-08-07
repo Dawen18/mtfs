@@ -7,6 +7,7 @@
 #define CONF_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Configs/"
 #define INSTALL_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Systems/"
 
+//#include <mtfs/structs.h>
 #include <option/optionparser.h>
 #include <iostream>
 #include <utils/Fs.h>
@@ -498,7 +499,7 @@ void installConfig(superblock_t &superblock, string name) {
 			plugin->attach(volume.second.params);
 
 			if (rootRedundancy > i)
-				plugin->putInode(0, rootInode);
+				plugin->put(0, &rootInode, INODE, false);
 			plugin->putSuperblock(superblock);
 
 			i++;

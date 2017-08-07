@@ -20,7 +20,6 @@ using namespace mtfs;
 
 namespace pluginSystem {
 	BlockDevice::BlockDevice() : nextFreeBlock(0), nextFreeDirBlock(0), nextFreeInode(1) {
-		srand((unsigned int) time(nullptr));
 		this->freeBlocks.clear();
 		this->freeDirBlocks.clear();
 		this->freeInodes.clear();
@@ -247,7 +246,6 @@ namespace pluginSystem {
 		assert(d.HasMember(IN_SIZE));
 		assert(d.HasMember(IN_LINKS));
 		assert(d.HasMember(IN_ACCESS));
-		assert(d.HasMember(IN_REFF));
 		assert(d.HasMember(IN_BLOCKS));
 
 		inode.accesRight = (uint16_t) d[IN_MODE].GetUint();
@@ -256,24 +254,6 @@ namespace pluginSystem {
 		inode.size = d[IN_SIZE].GetUint64();
 		inode.linkCount = (uint8_t) d[IN_LINKS].GetUint();
 		inode.atime = d[IN_ACCESS].GetUint64();
-
-		const Value &referenceArray = d[IN_REFF];
-		assert(referenceArray.IsArray());
-		inode.referenceId.clear();
-		for (auto &v : referenceArray.GetArray()) {
-			ident_t ident;
-
-			assert(v.IsObject());
-			assert(v.HasMember(ID_POOL));
-			assert(v.HasMember(ID_VOLUME));
-			assert(v.HasMember(ID_ID));
-
-			ident.poolId = (uint16_t) v[ID_POOL].GetUint();
-			ident.volumeId = (uint16_t) v[ID_VOLUME].GetUint();
-			ident.id = v[ID_ID].GetUint64();
-
-			inode.referenceId.push_back(ident);
-		}
 
 		const Value &dataArray = d[IN_BLOCKS];
 		assert(dataArray.IsArray());
@@ -548,7 +528,6 @@ namespace pluginSystem {
 		for (SizeType i = 0; i < inodeArray.Size(); i++) {
 			this->freeInodes.push_back(inodeArray[i].GetUint64());
 		}
-		return;
 	}
 
 	void BlockDevice::initDirBlocks() {
@@ -700,11 +679,11 @@ namespace pluginSystem {
 	}
 
 	bool BlockDevice::dirExists(string path) {
-		struct stat info;
+		struct stat info{};
 
 		if (stat(path.c_str(), &info) != 0)
 			return false;
-		else return (info.st_mode & S_IFDIR) != 0;
+		return (info.st_mode & S_IFDIR) != 0;
 	}
 
 	int BlockDevice::createFile(string path) {

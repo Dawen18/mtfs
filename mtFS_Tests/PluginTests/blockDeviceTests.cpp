@@ -101,8 +101,6 @@ TEST_F(BlockDeviceFixture, writeInode) {
 	ino.gid = 0;
 	ino.size = 1024;
 	ino.linkCount = 1;
-	ino.referenceId.push_back(rootIdent);
-	ino.referenceId.push_back(oIdent);
 	ino.atime = (unsigned long &&) time(nullptr);
 
 	for (int i = 0; i < 4; ++i) {
@@ -129,7 +127,6 @@ TEST_F(BlockDeviceFixture, readInode) {
 	original.gid = 1;
 	original.size = 1024;
 	original.linkCount = 1;
-	original.referenceId.push_back(rootIdent);
 	original.atime = (unsigned long &&) time(nullptr);
 
 	for (int i = 0; i < 4; ++i) {
@@ -221,7 +218,6 @@ TEST_F(BlockDeviceFixture, rootInode) {
 	inode.size = 1024;
 	inode.linkCount = 2;
 	inode.atime = (uint64_t) time(nullptr);
-	inode.referenceId.clear();
 	inode.dataBlocks.clear();
 
 	mtfs::inode_t readInode;

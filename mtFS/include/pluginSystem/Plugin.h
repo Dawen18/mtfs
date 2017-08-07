@@ -21,6 +21,10 @@ namespace pluginSystem {
 		static constexpr const char *TYPE = "plName";
 		static constexpr const char *PARAMS = "params";
 
+		enum statusCode {
+			SUCCESS,
+		};
+
 		virtual std::string getName()=0;
 
 		virtual bool attach(std::map<std::string, std::string> params)=0;

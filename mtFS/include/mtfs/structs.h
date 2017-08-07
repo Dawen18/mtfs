@@ -15,7 +15,6 @@
 #define IN_SIZE "size"
 #define IN_LINKS "linkCount"
 #define IN_ACCESS "atime"
-#define IN_REFF "referenceId"
 #define IN_BLOCKS "dataBlocks"
 
 #define ID_POOL "poolId"
@@ -63,8 +62,9 @@ namespace mtfs {
 		std::uint64_t id;
 
 		explicit ident_st(std::uint64_t id = 0, std::uint32_t vid = 0, std::uint32_t pid = 0) : id(id),
-																					   volumeId(vid),
-																					   poolId(pid) {}
+																								volumeId(vid),
+																								poolId(pid) {}
+
 		~ident_st() = default;
 
 		ident_st &operator=(const ident_st &id) {
@@ -120,18 +120,15 @@ namespace mtfs {
 	} ident_t;
 
 	typedef struct inode_st {
-		mode_t accesRight;
-		uid_t uid;
-		gid_t gid;
-		uint64_t size;
-		uint8_t linkCount;
+		mode_t accesRight{0};
+		uid_t uid{0};
+		gid_t gid{0};
+		uint64_t size{0};
+		uint32_t linkCount{1};
 		std::uint64_t atime;
-		std::vector<ident_t> referenceId;
 		std::vector<std::vector<ident_t>> dataBlocks;
-		std::vector<ident_t> idents;
 
-		inode_st() : accesRight(0), uid(0), gid(0), size(0), linkCount(1), atime((uint64_t) time(NULL)) {
-			this->referenceId.clear();
+		inode_st() : atime((uint64_t) time(nullptr)) {
 			this->dataBlocks.clear();
 		}
 
@@ -148,16 +145,6 @@ namespace mtfs {
 				return false;
 			if (atime != rhs.atime)
 				return false;
-
-			if (referenceId.size() != rhs.referenceId.size())
-				return false;
-			for (auto lb = referenceId.begin(), rb = rhs.referenceId.begin();
-				 lb != referenceId.end(); lb++, rb++) {
-				ident_t li = *lb, ri = *rb;
-
-				if (li != ri)
-					return false;
-			}
 
 			if (dataBlocks.size() != rhs.dataBlocks.size()) {
 //				std::cout << "size differ " << dataBlocks.size() << " " << rhs.dataBlocks.size() << std::endl;
@@ -206,16 +193,6 @@ namespace mtfs {
 			dest.AddMember(rapidjson::StringRef(IN_ACCESS), v, alloc);
 
 			rapidjson::Value a(rapidjson::kArrayType);
-			for (auto &&id : referenceId) {
-				rapidjson::Value ident(rapidjson::kObjectType);
-
-				id.toJson(ident, alloc);
-
-				a.PushBack(ident, alloc);
-			}
-			dest.AddMember(rapidjson::StringRef(IN_REFF), a, alloc);
-
-			a.SetArray();
 			for (auto &&blocks : dataBlocks) {
 				rapidjson::Value red(rapidjson::kArrayType);
 
@@ -231,10 +208,87 @@ namespace mtfs {
 			}
 			dest.AddMember(rapidjson::StringRef(IN_BLOCKS), a, alloc);
 		}
+
+		void fromJson(rapidjson::Document &d) {
+			assert(d.IsObject());
+			assert(d.HasMember(IN_MODE));
+			assert(d.HasMember(IN_UID));
+			assert(d.HasMember(IN_GID));
+			assert(d.HasMember(IN_SIZE));
+			assert(d.HasMember(IN_LINKS));
+			assert(d.HasMember(IN_ACCESS));
+			assert(d.HasMember(IN_BLOCKS));
+
+			this->accesRight = (uint16_t) d[IN_MODE].GetUint();
+			this->uid = (uint16_t) d[IN_UID].GetUint();
+			this->gid = (uint16_t) d[IN_GID].GetUint();
+			this->size = d[IN_SIZE].GetUint64();
+			this->linkCount = (uint8_t) d[IN_LINKS].GetUint();
+			this->atime = d[IN_ACCESS].GetUint64();
+
+			const rapidjson::Value &dataArray = d[IN_BLOCKS];
+			assert(dataArray.IsArray());
+			this->dataBlocks.clear();
+			for (auto &a : dataArray.GetArray()) {
+				std::vector<ident_t> redundancy;
+
+				assert(a.IsArray());
+				for (auto &v : a.GetArray()) {
+					ident_t ident;
+
+					assert(v.IsObject());
+					assert(v.HasMember(ID_POOL));
+					assert(v.HasMember(ID_VOLUME));
+					assert(v.HasMember(ID_ID));
+
+					ident.poolId = (uint16_t) v[ID_POOL].GetUint();
+					ident.volumeId = (uint16_t) v[ID_VOLUME].GetUint();
+					ident.id = v[ID_ID].GetUint64();
+
+					redundancy.push_back(ident);
+				}
+
+				this->dataBlocks.push_back(redundancy);
+			}
+		}
 	} inode_t;
 
 	typedef struct dirBlock_st {
 		std::map<std::string, std::vector<mtfs::ident_t>> entries;
+
+		void fromJson(rapidjson::Document &d) {
+			assert(d.IsObject());
+
+			for (auto &&item: d.GetObject()) {
+				assert(item.value.IsArray());
+
+				std::vector<ident_t> ids;
+
+				for (auto &&ident: item.value.GetArray()) {
+					ident_t i;
+					i.fromJson(ident);
+					ids.push_back(i);
+				}
+				this->entries.emplace(item.name.GetString(), ids);
+			}
+		}
+
+		void toJson(rapidjson::Document &d) {
+			d.SetObject();
+
+			rapidjson::Document::AllocatorType &allocator = d.GetAllocator();
+
+			for (auto &&item: this->entries) {
+				rapidjson::Value r(rapidjson::kArrayType);
+				for (auto &&ident: item.second) {
+					rapidjson::Value v(rapidjson::kObjectType);
+					ident.toJson(v, allocator);
+					r.PushBack(v, allocator);
+				}
+				d.AddMember(rapidjson::StringRef(item.first.c_str()), r, allocator);
+			}
+		}
+
 	} dirBlock_t;
 
 	typedef struct volume_st {
@@ -300,7 +354,7 @@ namespace mtfs {
 	typedef struct blockInfo_st {
 		ident_t id;
 		std::vector<ident_t> referenceId;
-		uint64_t lastAccess;
+		uint64_t lastAccess{0};
 
 		bool operator==(const blockInfo_st &other) const {
 			if (other.id != this->id)
@@ -313,9 +367,54 @@ namespace mtfs {
 			return (other.lastAccess == this->lastAccess);
 		}
 
-		blockInfo_st() : id(ident_t()), lastAccess(0) {
-			referenceId.clear();
+		blockInfo_st() : id(ident_t()) {
+//			referenceId.clear();
 		};
+
+		void toJson(rapidjson::Document &d) {
+			d.SetObject();
+			rapidjson::Document::AllocatorType &allocator = d.GetAllocator();
+
+			rapidjson::Value v;
+
+			rapidjson::Value a(rapidjson::kArrayType);
+			for (auto &&id : this->referenceId) {
+				v.SetObject();
+
+				v.AddMember(rapidjson::StringRef(ID_POOL), rapidjson::Value(id.poolId), allocator);
+				v.AddMember(rapidjson::StringRef(ID_VOLUME), rapidjson::Value(id.volumeId), allocator);
+				v.AddMember(rapidjson::StringRef(ID_ID), rapidjson::Value(id.id), allocator);
+
+				a.PushBack(v, allocator);
+			}
+			d.AddMember(rapidjson::StringRef(BI_REFF), a, allocator);
+
+			v.SetUint64(this->lastAccess);
+			d.AddMember(rapidjson::StringRef(BI_ACCESS), v, allocator);
+		}
+
+		void fromJson(rapidjson::Document &d) {
+			assert(d.IsObject());
+			assert(d.HasMember(BI_REFF));
+			assert(d[BI_REFF].IsArray());
+			assert(d.HasMember(BI_ACCESS));
+
+			for (auto &&id :d[BI_REFF].GetArray()) {
+				assert(id.IsObject());
+				assert(id.HasMember(ID_POOL));
+				assert(id.HasMember(ID_VOLUME));
+				assert(id.HasMember(ID_ID));
+
+				uint32_t poolId = id[ID_POOL].GetUint();
+				uint32_t volumeId = id[ID_VOLUME].GetUint();
+				uint64_t i = id[ID_ID].GetUint64();
+
+				this->referenceId.push_back(ident_st(i, volumeId, poolId));
+			}
+
+			this->lastAccess = d[BI_ACCESS].GetUint64();
+		}
+
 	} blockInfo_t;
 
 	typedef struct move_st {

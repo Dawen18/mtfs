@@ -63,7 +63,7 @@ target_link_libraries(mtfsCreate fuse3 dl boost_system boost_filesystem boost_th
 
 #link_directories(/usr/local/lib)
 
-add_definitions(-DDEBUG)
+#add_definitions(-DDEBUG)
 add_executable(mtfsMount src/mtfsMount.cpp
 		${CONF_HEAD} ${CONF_SRC}
 		${FS_HEAD} ${FS_SRC}
