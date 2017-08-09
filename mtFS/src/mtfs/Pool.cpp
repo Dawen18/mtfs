@@ -185,10 +185,46 @@ namespace mtfs {
 				ident_t newIdent(0, newVolumes.front());
 				this->volumes[newIdent.volumeId]->add(newIdent.id, type);
 
-				uint8_t datas[this->blockSize];
+				if (oldIdent.volumeId == newIdent.volumeId) {
+					continue;
+				}
+
+				void *datas = nullptr;
+				switch (type) {
+					case INODE:
+						datas = new inode_t();
+						break;
+					case DIR_BLOCK:
+						datas = new dirBlock_t();
+						break;
+					case DATA_BLOCK:
+						datas = new uint8_t[this->blockSize];
+						break;
+					default:
+						continue;
+				}
 				this->volumes[oldIdent.volumeId]->get(oldIdent.id, datas, type);
 
 				this->volumes[newIdent.volumeId]->put(newIdent.id, datas, type);
+				this->volumes[newIdent.volumeId]->putMetas(newIdent.id, blkInfos, type);
+
+				movedBlk.emplace(oldIdent, newIdent);
+
+				this->volumes[oldIdent.volumeId]->del(oldIdent.id, type);
+
+				switch (type) {
+					case INODE:
+						delete ((inode_t *) datas);
+						break;
+					case DIR_BLOCK:
+						delete ((dirBlock_t *) datas);
+						break;
+					case DATA_BLOCK:
+						delete[]((uint8_t *) datas);
+						break;
+					default:
+						break;
+				}
 			}
 
 			unsigned long nb = unsatisfy.size();

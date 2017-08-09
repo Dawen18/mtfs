@@ -9,6 +9,7 @@
 #include <pluginSystem/Plugin.h>
 
 #include "pluginSystem/PluginManager.h"
+#include "../../../Plugin/S3/S3.h"
 
 using namespace std;
 using namespace boost::filesystem;
@@ -45,8 +46,11 @@ namespace pluginSystem {
 	}
 
 	void PluginManager::freePlugin(std::string pluginName, Plugin *plugin) {
+		if ("s3" == pluginName)
+			return;
 		if (this->pluginMap.find(pluginName) == this->pluginMap.end()) {
 			this->lastError = PLUGIN_NOT_FOUND;
+			return;
 		}
 
 		this->pluginMap[pluginName].destroyObj(plugin);
@@ -58,6 +62,17 @@ namespace pluginSystem {
 	}
 
 	int PluginManager::getInfo(std::string pluginName, pluginInfo_t &info) {
+		if ("s3" == pluginName) {
+			vector<string> params;
+			params.emplace_back("bucket");
+			params.emplace_back("region");
+
+			info.name = pluginSystem::S3::NAME;
+			info.params = params;
+
+			return SUCCESS;
+		}
+
 		if (this->pluginMap.find(pluginName) == this->pluginMap.end()) {
 			this->lastError = PLUGIN_NOT_FOUND;
 			return PLUGIN_NOT_FOUND;
@@ -91,12 +106,16 @@ namespace pluginSystem {
 	}
 
 	Plugin *PluginManager::loadPlugin(string name) {
-		plugin_t plugin;
+		plugin_t plugin{};
 		string path = string("./") + PLUGIN_DIR + "/lib" + name + ".so";
+
+		if ("s3" == name) {
+			return new pluginSystem::S3();
+		}
 
 //		Open plugin
 		void *library = dlopen(path.c_str(), RTLD_LAZY);
-		if (!library) {
+		if (nullptr == library) {
 			cerr << "Cannot load plugin '" << name << "': " << dlerror() << endl;
 			return nullptr;
 		}

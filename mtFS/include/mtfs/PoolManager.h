@@ -32,17 +32,17 @@ namespace mtfs {
 
 		std::mutex inodeMutex;
 		std::set<ident_t> lockedInodes;
-		std::mutex inodeTransMutex;
+		std::recursive_mutex inodeTransMutex;
 		std::map<ident_t, ident_t> inodeTranslateMap;
 
 		std::mutex dirMutex;
 		std::set<ident_t> lockedDirBlock;
-		std::mutex dirTransMutex;
+		std::recursive_mutex dirTransMutex;
 		std::map<ident_t, ident_t> dirBlockTranslateMap;
 
 		std::mutex blockMutex;
 		std::set<ident_t> lockedBlocks;
-		std::mutex blockTransMutex;
+		std::recursive_mutex blockTransMutex;
 		std::map<ident_t, ident_t> blockTranslateMap;
 
 
@@ -77,6 +77,9 @@ namespace mtfs {
 
 		int getValidPools(const ruleInfo_t &info, std::vector<uint32_t> &poolIds);
 
+		void dumpTranslateMap(const int &nb, const blockType &type);
+
+		const int moveBlk(const ident_t &old, const ident_t &cur, const blockType &type);
 	};
 
 }  // namespace mtfs

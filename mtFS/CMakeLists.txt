@@ -40,6 +40,7 @@ set(MTFUSE_SRC
 
 set(CONF_HEAD
 		include/pluginSystem/PluginManager.h
+		include/pluginSystem/Plugin.h
 		src/utils/Semaphore.cpp include/utils/Semaphore.h src/mtfs/Migrator.cpp include/mtfs/Migrator.h)
 
 set(CONF_SRC
@@ -56,10 +57,14 @@ set(UTILS
 		include/utils/Logger.h
 		)
 
-add_executable(mtfsCreate src/mtfsCreate.cpp
-		${FS_SRC} ${CONF_SRC} ${UTILS})
+set(CMAKE_PREFIX_PATH /opt/aws-build)
+find_package(aws-sdk-cpp)
+add_definitions(-DUSE_IMPORT_EXPORT)
 
-target_link_libraries(mtfsCreate fuse3 dl boost_system boost_filesystem boost_thread pthread)
+add_executable(mtfsCreate src/mtfsCreate.cpp
+		${FS_SRC} ${CONF_SRC} ${UTILS} ../Plugin/S3/S3.cpp)
+
+target_link_libraries(mtfsCreate fuse3 dl boost_system boost_filesystem boost_thread pthread aws-cpp-sdk-s3)
 
 #link_directories(/usr/local/lib)
 
@@ -69,6 +74,7 @@ add_executable(mtfsMount src/mtfsMount.cpp
 		${FS_HEAD} ${FS_SRC}
 		${MTFUSE_HEAD} ${MTFUSE_SRC}
 		${UTILS}
+		../Plugin/S3/S3.cpp
 		)
 
-target_link_libraries(mtfsMount fuse3 dl boost_system boost_filesystem boost_thread pthread)
+target_link_libraries(mtfsMount fuse3 dl boost_system boost_filesystem boost_thread pthread aws-cpp-sdk-s3)

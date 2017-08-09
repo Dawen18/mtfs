@@ -5,6 +5,10 @@ namespace mtfs {
 	using namespace std;
 
 	PoolManager::~PoolManager() {
+		dumpTranslateMap(INT_MAX, INODE);
+		dumpTranslateMap(INT_MAX, DIR_BLOCK);
+		dumpTranslateMap(INT_MAX, DATA_BLOCK);
+
 		for (auto &&pool: this->pools) {
 			delete pool.second;
 		}
@@ -86,8 +90,29 @@ namespace mtfs {
 		ident_t newId = id;
 		this->hasMoved(id, newId, type);
 
-		if (!this->isLocked(newId, type))
+		if (!this->isLocked(newId, type)) {
+			string message = "get ";
+
+			switch (type) {
+				case INODE:
+					message += "inode ";
+					break;
+				case DIR_BLOCK:
+					message += "dir block ";
+					break;
+				case DATA_BLOCK:
+					message += "dat block ";
+					break;
+				case SUPERBLOCK:
+					message += "superblock ";
+					break;
+			}
+
+			message += newId.toString();
+
+			Logger::getInstance()->log("POOL_MANAGER", message, Logger::L_DEBUG);
 			ret = this->pools[newId.poolId]->get(newId.volumeId, newId.id, data, type);
+		}
 
 		return ret;
 	}
@@ -141,6 +166,8 @@ namespace mtfs {
 	void PoolManager::doMigration(const blockType type) {
 		vector<ident_t> unsatisfyBlk;
 
+		this->dumpTranslateMap(10, type);
+
 		for (auto &&pool: this->pools) {
 			map<ident_t, ident_t> tmpMovedBlk;
 			pool.second->doMigration(tmpMovedBlk, unsatisfyBlk, type);
@@ -150,10 +177,30 @@ namespace mtfs {
 
 				key.poolId = pool.first;
 				val.poolId = pool.first;
-				this->blockTranslateMap.insert(make_pair(key, val));
+				recursive_mutex *mu = nullptr;
+				map<ident_t, ident_t> *map = nullptr;
+				switch (type) {
+					case INODE:
+						mu = &this->inodeTransMutex;
+						map = &this->inodeTranslateMap;
+						break;
+					case DIR_BLOCK:
+						mu = &this->dirTransMutex;
+						map = &this->dirBlockTranslateMap;
+						break;
+					case DATA_BLOCK:
+						mu = &this->blockTransMutex;
+						map = &this->blockTranslateMap;
+						break;
+					case SUPERBLOCK:
+						continue;
+						break;
+				}
+				unique_lock<recursive_mutex> lk(*mu);
+				map->emplace(key, val);
 			}
 
-			Logger::getInstance()->log("Poolmanager", "endMig",Logger::level::L_DEBUG);
+			Logger::getInstance()->log("Poolmanager", "endMig", Logger::level::L_DEBUG);
 		}
 	}
 
@@ -248,7 +295,7 @@ namespace mtfs {
 	}
 
 	bool PoolManager::hasMoved(const ident_t &id, ident_t &newId, const blockType &type) {
-		mutex *mu = nullptr;
+		recursive_mutex *mu = nullptr;
 		map<ident_t, ident_t> *transMap = nullptr;
 
 		switch (type) {
@@ -264,12 +311,14 @@ namespace mtfs {
 				mu = &this->blockTransMutex;
 				transMap = &this->blockTranslateMap;
 				break;
+			default:
+				return false;
 		}
 
 		assert(mu != nullptr);
 		assert(transMap != nullptr);
 
-		unique_lock<mutex> lk(*mu);
+		unique_lock<recursive_mutex> lk(*mu);
 		if (transMap->find(id) != transMap->end()) {
 			newId = (*transMap)[id];
 			return true;
@@ -287,5 +336,66 @@ namespace mtfs {
 		return SUCCESS;
 	}
 
+	void PoolManager::dumpTranslateMap(const int &nb, const blockType &type) {
+
+		recursive_mutex *mu;
+		map<ident_t, ident_t> *tm;
+		switch (type) {
+			case INODE:
+				mu = &this->inodeTransMutex;
+				tm = &this->inodeTranslateMap;
+				break;
+			case DIR_BLOCK:
+				mu = &this->dirTransMutex;
+				tm = &this->dirBlockTranslateMap;
+				break;
+			case DATA_BLOCK:
+				mu = &this->blockTransMutex;
+				tm = &this->blockTranslateMap;
+				break;
+			default:
+				return;
+		}
+
+		unique_lock<recursive_mutex> lk(*mu);
+		int i = 0;
+		for (auto &&item :*tm) {
+			if (nb == i)
+				break;
+			if (SUCCESS == this->moveBlk(item.first, item.second, type)) {
+				tm->erase(item.first);
+			}
+			i++;
+		}
+	}
+
+	const int PoolManager::moveBlk(const ident_t &old, const ident_t &cur, const blockType &type) {
+		blockInfo_t metas{};
+		this->pools[cur.poolId]->getMetas(cur.volumeId, cur.id, metas, type);
+		dirBlock_t dirBlock{};
+
+		switch (type) {
+			case INODE:
+				this->get(metas.referenceId.front(), &dirBlock, DIR_BLOCK);
+				for (auto &&item :dirBlock.entries) {
+					for (auto &i : item.second) {
+						if (old == i)
+							i = cur;
+					}
+				}
+				for (auto &&ref :metas.referenceId) {
+					this->put(ref, &dirBlock, DIR_BLOCK);
+				}
+				break;
+			case DIR_BLOCK:
+				break;
+			case DATA_BLOCK:
+				break;
+			default:
+				break;
+		}
+
+		return SUCCESS;
+	}
 
 }  // namespace mtfs

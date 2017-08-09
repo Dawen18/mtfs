@@ -42,7 +42,6 @@ namespace mtfs {
 		pool *dlThPool{nullptr};
 
 		dl_st() {
-			fifo.inodeQueue = nullptr;
 		}
 	};
 
@@ -280,17 +279,6 @@ namespace mtfs {
 
 	void Mtfs::destroy(void *userdata) {
 		(void) userdata;
-//		uint64_t iptr = (uint64_t) this->inodes;
-//		uint64_t dptr = (uint64_t) this->dirBlocks;
-//		uint64_t bptr = (uint64_t) this->blocks;
-
-//		if (iptr != dptr && iptr != bptr)
-//			delete this->inodes;
-
-//		if (dptr != bptr)
-//			delete this->dirBlocks;
-
-		delete this->blocks;
 
 		unique_lock<mutex> lk(*this->migratorInfo.endMutex);
 		this->migratorInfo.end = true;
@@ -298,6 +286,17 @@ namespace mtfs {
 		this->migratorInfo.condV.notify_all();
 
 		this->migratorThr.join();
+
+		Acces *iptr = this->inodes;
+		Acces *dptr = this->dirBlocks;
+		Acces *bptr = this->blocks;
+
+		if (iptr != dptr && iptr != bptr)
+			delete this->inodes;
+
+		if (dptr != bptr)
+			delete this->dirBlocks;
+		delete this->blocks;
 	}
 
 	void Mtfs::getAttr(fuse_req_t req, fuse_ino_t ino, fuse_file_info *fi) {
@@ -450,7 +449,7 @@ namespace mtfs {
 		}
 
 		pool mPool(SIMULT_UP);
-		this->initMetas(*parentInode, inodeIdents, blockType::DIR_BLOCK, &mPool);
+		this->initMetas(*parentInode, inodeIdents, blockType::INODE, &mPool);
 
 //			Add entry in dir
 		if (0 != (ret = this->addEntry(parentInode, name, inodeIdents))) {
@@ -483,7 +482,7 @@ namespace mtfs {
 		}
 
 		pool mPool(SIMULT_UP);
-		this->initMetas(*parentInode, inodeIdents, blockType::DIR_BLOCK, &mPool);
+		this->initMetas(*parentInode, inodeIdents, blockType::INODE, &mPool);
 
 //			Add entry in dir
 		if (0 != (ret = this->addEntry(parentInode, name, inodeIdents))) {
@@ -990,8 +989,8 @@ namespace mtfs {
 //			else get the first block.
 			blockIdents = parentInode->inode.dataBlocks.back();
 
-			for (int i = 0; i < blockIdents.size(); ++i) {
-				if (0 == (ret = this->dirBlocks->get(blockIdents[i], &dirBlock, blockType::DIR_BLOCK)))
+			for (const auto &blockIdent : blockIdents) {
+				if (0 == (ret = this->dirBlocks->get(blockIdent, &dirBlock, blockType::DIR_BLOCK)))
 					break;
 			}
 
@@ -1373,6 +1372,8 @@ namespace mtfs {
 						thPool->schedule(bind(&Acces::putMetas, this->blocks, id, metas, type));
 					else
 						this->blocks->putMetas(id, metas, type);
+					break;
+				default:
 					break;
 			}
 		}

@@ -117,6 +117,11 @@ namespace mtfs {
 			this->id = src[ID_ID].GetUint64();
 		}
 
+		std::string toString() {
+			return "p:" + std::to_string(this->poolId) + " v:" + std::to_string(this->volumeId) + " i:" +
+				   std::to_string(this->id);
+		}
+
 	} ident_t;
 
 	typedef struct inode_st {

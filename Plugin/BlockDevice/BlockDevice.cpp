@@ -9,6 +9,7 @@
 #include <rapidjson/istreamwrapper.h>
 #include <fstream>
 #include <memory>
+#include <utils/Logger.h>
 
 #include "BlockDevice.h"
 
@@ -52,7 +53,7 @@ namespace pluginSystem {
 		this->mountpoint = parentDir + this->devicePath.substr(this->devicePath.find('/', 1) + 1);
 
 #ifdef DEBUG
-		//		cout << "attach to " << this->mountpoint;
+		Logger::getInstance()->log("BLOCK", "create dir in home", Logger::L_INFO);
 #endif
 
 		if (!dirExists(parentDir)) {
@@ -69,10 +70,10 @@ namespace pluginSystem {
 			}
 		}
 
-#ifndef DEBUG
+//#ifndef DEBUG
 		//		Mount device
 		mount(this->devicePath.c_str(), this->mountpoint.c_str(), this->fsType.c_str(), 0, nullptr);
-#endif
+//#endif
 
 		initDirHierarchie();
 
@@ -87,7 +88,7 @@ namespace pluginSystem {
 		writeMetas();
 
 #ifndef DEBUG
-		if (umount(this->mountpoint.c_str()) != 0) {
+		if (umount2(this->mountpoint.c_str(), MNT_DETACH) != 0) {
 			cerr << "ERROR Failed to umount: " << this->mountpoint << endl;
 			cerr << "reason: " << strerror(errno) << " [" << errno << "]" << endl;
 			return false;

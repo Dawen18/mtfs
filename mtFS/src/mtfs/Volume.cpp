@@ -111,20 +111,6 @@ namespace mtfs {
 			id = new uint64_t();
 			tmp.push_back(id);
 			thPool.schedule(bind(&pluginSystem::Plugin::add, this->plugin, id, type));
-//			switch (type) {
-//				case INODE:
-//					thPool.schedule(bind(&pluginSystem::Plugin::add, this->plugin, id, type));
-//					break;
-//				case DIR_BLOCK:
-//					thPool.schedule(bind(&pluginSystem::Plugin::add, this->plugin, id, type));
-//					break;
-//				case DATA_BLOCK:
-//					thPool.schedule(bind(&pluginSystem::Plugin::add, this->plugin, id, type));
-//					break;
-//				default:
-//					TODO log
-//					break;
-//			}
 		}
 
 		thPool.wait();
@@ -144,21 +130,6 @@ namespace mtfs {
 		if (ENOSYS == ret) {
 //				TODO log noimplemented
 		}
-
-//		switch (type) {
-//			case INODE:
-//				ret = this->plugin->delInode(id);
-//				break;
-//			case DIR_BLOCK:
-//				ret = this->plugin->delDirBlock(id);
-//				break;
-//			case DATA_BLOCK:
-//				ret = this->plugin->delBlock(id);
-//				break;
-//			default:
-//				ret = ENOSYS;
-//				break;
-//		}
 
 		return ret;
 	}
@@ -227,6 +198,32 @@ namespace mtfs {
 
 	int Volume::putMetas(const uint64_t &id, const blockInfo_t &metas, const blockType &type) {
 		return this->plugin->put(id, &metas, type, true);
+
+		map<uint64_t, uint64_t> *access = nullptr;
+		mutex *mu;
+		switch (type) {
+			case INODE:
+//				ret = this->plugin->getInodeMetas(id, metas);
+				mu = &this->iaMutex;
+				access = &this->inodesAccess;
+				break;
+			case DIR_BLOCK:
+//				ret = this->plugin->getDirBlockMetas(id, metas);
+				mu = &this->daMutex;
+				access = &this->dirBlockAccess;
+				break;
+			case DATA_BLOCK:
+//				ret = this->plugin->getBlockMetas(id, metas);
+				mu = &this->baMutex;
+				access = &this->blocksAccess;
+				break;
+			default:
+				return ENOSYS;
+		}
+
+		unique_lock<mutex> lk(*mu);
+		if (access->end() == access->find(id))
+			(*access)[id] = metas.lastAccess;
 	}
 
 	bool Volume::updateLastAccess(const uint64_t &id, const blockType &type) {
@@ -234,6 +231,8 @@ namespace mtfs {
 		mutex *mu;
 		switch (type) {
 			case INODE:
+				if (0 == id)
+					return true;
 				mu = &this->iaMutex;
 				mp = &this->inodesAccess;
 				break;
