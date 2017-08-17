@@ -1,19 +1,39 @@
 /**
- * @author David Wittwer
- * @date 22.04.17.
-**/
+ * \file blockDeviceTests.cpp
+ * \brief
+ * \author David Wittwer
+ * \version 0.0.1
+ * \copyright GNU Publis License V3
+ *
+ * This file is part of MTFS.
+
+    MTFS is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Foobar is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include <gtest/gtest.h>
 #include <BlockDevice/BlockDevice.h>
 #include <mtfs/Mtfs.h>
 //#include <mtfs/structs.h>
 
-#define BLOCK_SIZE 4096
 
 using namespace std;
 using namespace pluginSystem;
 
 #define HOME "/home/david/Cours/4eme/Travail_bachelor/Home/Plugins/"
+#define BLOCK_SIZE 4096
+#define DEVICE "/dev/tests"
+#define FS_TYPE "ext4"
 
 TEST(BlockDevice, attachDetach) {
 #ifndef DEBUG
@@ -25,8 +45,8 @@ TEST(BlockDevice, attachDetach) {
 	map<string, string> params;
 	params.insert(make_pair("home", HOME));
 	params.insert(make_pair("blockSize", to_string(BLOCK_SIZE)));
-	params.insert(make_pair("devicePath", "/dev/sdd1"));
-	params.insert(make_pair("fsType", "ext4"));
+	params.insert(make_pair("devicePath", DEVICE));
+	params.insert(make_pair("fsType", FS_TYPE));
 	ASSERT_TRUE(blockDevice.attach(params));
 	ASSERT_TRUE(blockDevice.detach());
 }
@@ -43,8 +63,8 @@ public:
 		map<string, string> params;
 		params.insert(make_pair("home", HOME));
 		params.insert(make_pair("blockSize", "4096"));
-		params.insert(make_pair("devicePath", "/dev/sdd1"));
-		params.insert(make_pair("fsType", "ext4"));
+		params.insert(make_pair("devicePath", DEVICE));
+		params.insert(make_pair("fsType", FS_TYPE));
 		blockDevice.attach(params);
 	}
 
@@ -142,7 +162,6 @@ TEST_F(BlockDeviceFixture, readInode) {
 
 	uint64_t inodeId;
 	blockDevice.add(&inodeId, mtfs::blockType::INODE);
-	cout << "inodeId " << inodeId << "  " << endl;
 	blockDevice.put(inodeId, &original, mtfs::blockType::INODE, false);
 	ASSERT_EQ(0, blockDevice.get(inodeId, &inode, mtfs::blockType::INODE, false));
 

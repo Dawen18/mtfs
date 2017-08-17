@@ -1,3 +1,26 @@
+/**
+ * \file Volume.cpp
+ * \brief
+ * \author David Wittwer
+ * \version 0.0.1
+ * \copyright GNU Publis License V3
+ *
+ * This file is part of MTFS.
+
+    MTFS is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Foobar is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <pluginSystem/PluginManager.h>
 #include <thread>
 #include <boost/thread.hpp>
@@ -85,20 +108,31 @@ namespace mtfs {
 		if (ENOSYS == ret) {
 //				TODO log noimplemented
 		}
-//		switch (type) {
-//			case INODE:
-//				ret = this->plugin->addInode(&id);
-//				break;
-//			case DIR_BLOCK:
-//				ret = this->plugin->addDirBlock(&id);
-//				break;
-//			case DATA_BLOCK:
-//				ret = this->plugin->addBlock(&id);
-//				break;
-//			default:
-//				ret = ENOSYS;
-//				break;
-//		}
+		mutex *mu = nullptr;
+		map<uint64_t, uint64_t> *ma = nullptr;
+
+		switch (type) {
+			case INODE:
+				mu = &this->niMutex;
+				ma = &this->newInode;
+				break;
+			case DIR_BLOCK:
+				mu = &this->ndMutex;
+				ma = &this->newData;
+				break;
+			case DATA_BLOCK:
+				mu = &this->nbMutex;
+				ma = &this->newData;
+				break;
+			default:
+				return ENOSYS;
+		}
+
+		//			add id in newBlock map
+		unique_lock<mutex> lk(*mu);
+		ma->emplace(id, time(nullptr));
+		lk.unlock();
+
 		return ret;
 	}
 
@@ -115,7 +149,32 @@ namespace mtfs {
 
 		thPool.wait();
 
+		mutex *mu = nullptr;
+		map<uint64_t, uint64_t> *ma = nullptr;
+
+		switch (type) {
+			case INODE:
+				mu = &this->niMutex;
+				ma = &this->newInode;
+				break;
+			case DIR_BLOCK:
+				mu = &this->ndMutex;
+				ma = &this->newData;
+				break;
+			case DATA_BLOCK:
+				mu = &this->nbMutex;
+				ma = &this->newData;
+				break;
+			default:
+				return ENOSYS;
+		}
+
 		for (auto &&item: tmp) {
+//			add id in newBlock map
+			unique_lock<mutex> lk(*mu);
+			ma->emplace(*item, time(nullptr));
+			lk.unlock();
+
 			ids.push_back(*item);
 			delete item;
 		}
@@ -130,6 +189,29 @@ namespace mtfs {
 		if (ENOSYS == ret) {
 //				TODO log noimplemented
 		}
+
+		map<uint64_t, uint64_t> *access = nullptr;
+		mutex *mu;
+		switch (type) {
+			case INODE:
+				mu = &this->iaMutex;
+				access = &this->inodesAccess;
+				break;
+			case DIR_BLOCK:
+				mu = &this->daMutex;
+				access = &this->dirBlockAccess;
+				break;
+			case DATA_BLOCK:
+				mu = &this->baMutex;
+				access = &this->blocksAccess;
+				break;
+			default:
+				return ENOSYS;
+		}
+
+		unique_lock<mutex> lk(*mu);
+		access->erase(id);
+		lk.unlock();
 
 		return ret;
 	}
@@ -162,24 +244,22 @@ namespace mtfs {
 
 	int Volume::getMetas(const uint64_t &id, blockInfo_t &metas, const blockType &type) {
 		int ret;
-
-		ret = this->plugin->get(id, &metas, type, true);
+		if (EXIT_SUCCESS != (ret = this->plugin->get(id, &metas, type, true))) {
+			return ret;
+		}
 
 		map<uint64_t, uint64_t> *access = nullptr;
 		mutex *mu;
 		switch (type) {
 			case INODE:
-//				ret = this->plugin->getInodeMetas(id, metas);
 				mu = &this->iaMutex;
 				access = &this->inodesAccess;
 				break;
 			case DIR_BLOCK:
-//				ret = this->plugin->getDirBlockMetas(id, metas);
 				mu = &this->daMutex;
 				access = &this->dirBlockAccess;
 				break;
 			case DATA_BLOCK:
-//				ret = this->plugin->getBlockMetas(id, metas);
 				mu = &this->baMutex;
 				access = &this->blocksAccess;
 				break;
@@ -190,30 +270,31 @@ namespace mtfs {
 		unique_lock<mutex> lk(*mu);
 		if (access->end() == access->find(id))
 			(*access)[id] = metas.lastAccess;
-		else
-			metas.lastAccess = (*access)[id];
 
 		return ret;
 	}
 
 	int Volume::putMetas(const uint64_t &id, const blockInfo_t &metas, const blockType &type) {
-		return this->plugin->put(id, &metas, type, true);
+		if (0 == id && INODE == type)
+			return EXIT_SUCCESS;
+
+		int ret;
+		if (EXIT_SUCCESS != (ret = this->plugin->put(id, &metas, type, true))) {
+			return ret;
+		}
 
 		map<uint64_t, uint64_t> *access = nullptr;
 		mutex *mu;
 		switch (type) {
 			case INODE:
-//				ret = this->plugin->getInodeMetas(id, metas);
 				mu = &this->iaMutex;
 				access = &this->inodesAccess;
 				break;
 			case DIR_BLOCK:
-//				ret = this->plugin->getDirBlockMetas(id, metas);
 				mu = &this->daMutex;
 				access = &this->dirBlockAccess;
 				break;
 			case DATA_BLOCK:
-//				ret = this->plugin->getBlockMetas(id, metas);
 				mu = &this->baMutex;
 				access = &this->blocksAccess;
 				break;
@@ -222,43 +303,16 @@ namespace mtfs {
 		}
 
 		unique_lock<mutex> lk(*mu);
-		if (access->end() == access->find(id))
-			(*access)[id] = metas.lastAccess;
+		(*access)[id] = metas.lastAccess;
+
+		return ret;
 	}
 
 	bool Volume::updateLastAccess(const uint64_t &id, const blockType &type) {
-		map<uint64_t, uint64_t> *mp;
-		mutex *mu;
-		switch (type) {
-			case INODE:
-				if (0 == id)
-					return true;
-				mu = &this->iaMutex;
-				mp = &this->inodesAccess;
-				break;
-			case DIR_BLOCK:
-				mu = &this->daMutex;
-				mp = &this->dirBlockAccess;
-				break;
-			case DATA_BLOCK:
-				mu = &this->baMutex;
-				mp = &this->blocksAccess;
-				break;
-			default:
-				return false;
-		}
-
 		blockInfo_t metas = blockInfo_t();
 		this->getMetas(id, metas, type);
 
-		uint64_t now;
-		now = (uint64_t) time(nullptr);
-		{
-			unique_lock<mutex> lk(*mu);
-			(*mp)[id] = now;
-		}
-
-		metas.lastAccess = now;
+		metas.lastAccess = static_cast<uint64_t>(time(nullptr));
 		this->putMetas(id, metas, type);
 
 		return true;
@@ -277,6 +331,8 @@ namespace mtfs {
 	}
 
 	int Volume::getUnsatisfy(vector<blockInfo_t> &unsatisfy, const blockType &type, const int limit) {
+		this->purgeNewMap(type);
+
 		int nb = 0;
 		if (this->isTimeVolume) {
 			vector<uint64_t> under;
@@ -304,20 +360,28 @@ namespace mtfs {
 		const uint64_t maxTimestamp = now - this->minDelay;
 		const uint64_t minTimestamp = 0 == this->maxDelay ? 0 : now - this->maxDelay;
 
-		map<uint64_t, uint64_t> *mp;
 		mutex *mu;
+		map<uint64_t, uint64_t> *mp;
+		mutex *newMut;
+		map<uint64_t, uint64_t> *newMap;
 		switch (type) {
 			case INODE:
 				mu = &this->iaMutex;
 				mp = &this->inodesAccess;
+				newMut = &this->niMutex;
+				newMap = &this->newInode;
 				break;
 			case DIR_BLOCK:
 				mu = &this->daMutex;
 				mp = &this->dirBlockAccess;
+				newMut = &this->ndMutex;
+				newMap = &this->newDir;
 				break;
 			case DATA_BLOCK:
 				mu = &this->baMutex;
 				mp = &this->blocksAccess;
+				newMut = &this->ndMutex;
+				newMap = &this->newData;
 				break;
 			default:
 				return ENOSYS;
@@ -325,11 +389,50 @@ namespace mtfs {
 
 		unique_lock<mutex> lk(*mu);
 		for (auto &&item :*mp) {
+			if (0 == item.first && INODE == type)
+				continue;
+			unique_lock<mutex> nlk(*newMut);
+			if (newMap->end() != newMap->find(item.first)) {
+				nlk.unlock();
+				continue;
+			}
+			nlk.unlock();
+
 			if (!(maxTimestamp > item.second && minTimestamp < item.second))
 				blocks.push_back(item.first);
 		}
 
 		return 0;
+	}
+
+	void Volume::purgeNewMap(const blockType &type) {
+		mutex *mu = nullptr;
+		map<uint64_t, uint64_t> *ma = nullptr;
+
+		switch (type) {
+			case INODE:
+				mu = &this->niMutex;
+				ma = &this->newInode;
+				break;
+			case DIR_BLOCK:
+				mu = &this->ndMutex;
+				ma = &this->newData;
+				break;
+			case DATA_BLOCK:
+				mu = &this->nbMutex;
+				ma = &this->newData;
+				break;
+			default:
+				return;
+		}
+
+		uint64_t newTimestamp = time(nullptr) - NEW_DELAY;
+
+		unique_lock<mutex> lk(*mu);
+		for (auto &&item :*ma) {
+			if (newTimestamp > item.second)
+				ma->erase(item.first);
+		}
 	}
 
 }  // namespace mtfs

@@ -1,7 +1,26 @@
 /**
- * @author David Wittwer
- * @date 07.05.17.
-**/
+ * \file PluginManager.cpp
+ * \brief
+ * \author David Wittwer
+ * \version 0.0.1
+ * \copyright GNU Publis License V3
+ *
+ * This file is part of MTFS.
+
+    MTFS is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Foobar is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <dlfcn.h>
 #include <boost/filesystem.hpp>
 #include <boost/range/iterator_range.hpp>
@@ -46,8 +65,6 @@ namespace pluginSystem {
 	}
 
 	void PluginManager::freePlugin(std::string pluginName, Plugin *plugin) {
-		if ("s3" == pluginName)
-			return;
 		if (this->pluginMap.find(pluginName) == this->pluginMap.end()) {
 			this->lastError = PLUGIN_NOT_FOUND;
 			return;
@@ -62,17 +79,6 @@ namespace pluginSystem {
 	}
 
 	int PluginManager::getInfo(std::string pluginName, pluginInfo_t &info) {
-		if ("s3" == pluginName) {
-			vector<string> params;
-			params.emplace_back("bucket");
-			params.emplace_back("region");
-
-			info.name = pluginSystem::S3::NAME;
-			info.params = params;
-
-			return SUCCESS;
-		}
-
 		if (this->pluginMap.find(pluginName) == this->pluginMap.end()) {
 			this->lastError = PLUGIN_NOT_FOUND;
 			return PLUGIN_NOT_FOUND;
@@ -109,10 +115,6 @@ namespace pluginSystem {
 		plugin_t plugin{};
 		string path = string("./") + PLUGIN_DIR + "/lib" + name + ".so";
 
-		if ("s3" == name) {
-			return new pluginSystem::S3();
-		}
-
 //		Open plugin
 		void *library = dlopen(path.c_str(), RTLD_LAZY);
 		if (nullptr == library) {
@@ -124,7 +126,7 @@ namespace pluginSystem {
 //		Load createObj symbol
 		plugin.createObj = (pluginSystem::Plugin *(*)()) dlsym(library, "createObj");
 		char *dlsym_error = dlerror();
-		if (dlsym_error) {
+		if (nullptr != dlsym_error) {
 			cerr << "Cannot load symbol create: " << dlsym_error << endl;
 			return nullptr;
 		}

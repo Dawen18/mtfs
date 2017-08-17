@@ -1,7 +1,25 @@
 /**
- * @author David Wittwer
- * @date 01.08.17.
-**/
+ * \file s3Tests.cpp
+ * \brief
+ * \author David Wittwer
+ * \version 0.0.1
+ * \copyright GNU Publis License V3
+ *
+ * This file is part of MTFS.
+
+    MTFS is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Foobar is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include <gtest/gtest.h>
 #include <S3/S3.h>
@@ -142,7 +160,6 @@ TEST_F(S3Fixture, readInode) {
 
 	uint64_t inodeId;
 	s3.add(&inodeId, mtfs::blockType::INODE);
-	cout << "inodeId " << inodeId << "  " << endl;
 	s3.put(inodeId, &original, mtfs::blockType::INODE, false);
 	ASSERT_EQ(0, s3.get(inodeId, &inode, mtfs::blockType::INODE, false));
 

@@ -1,3 +1,26 @@
+/**
+ * \file PoolManager.cpp
+ * \brief
+ * \author David Wittwer
+ * \version 0.0.1
+ * \copyright GNU Publis License V3
+ *
+ * This file is part of MTFS.
+
+    MTFS is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Foobar is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <mtfs/PoolManager.h>
 #include <utils/Logger.h>
 
@@ -5,10 +28,9 @@ namespace mtfs {
 	using namespace std;
 
 	PoolManager::~PoolManager() {
-		dumpTranslateMap(INT_MAX, INODE);
-		dumpTranslateMap(INT_MAX, DIR_BLOCK);
-		dumpTranslateMap(INT_MAX, DATA_BLOCK);
-
+//		dumpTranslateMap(INT_MAX, INODE);
+//		dumpTranslateMap(INT_MAX, DIR_BLOCK);
+//		dumpTranslateMap(INT_MAX, DATA_BLOCK);
 		for (auto &&pool: this->pools) {
 			delete pool.second;
 		}
@@ -166,7 +188,7 @@ namespace mtfs {
 	void PoolManager::doMigration(const blockType type) {
 		vector<ident_t> unsatisfyBlk;
 
-		this->dumpTranslateMap(10, type);
+//		this->dumpTranslateMap(10, type);
 
 		for (auto &&pool: this->pools) {
 			map<ident_t, ident_t> tmpMovedBlk;
@@ -388,10 +410,19 @@ namespace mtfs {
 				}
 				break;
 			case DIR_BLOCK:
-				break;
 			case DATA_BLOCK:
-				break;
-			default:
+				inode_t inode{};
+				this->get(metas.referenceId.front(), &inode, INODE);
+
+				for (auto &&blks :inode.dataBlocks) {
+					for (auto &blk :blks) {
+						if (old == blk)
+							blk = cur;
+					}
+				}
+				for (auto &&ref :metas.referenceId) {
+					this->put(ref, &inode, INODE);
+				}
 				break;
 		}
 

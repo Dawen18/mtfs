@@ -1,3 +1,26 @@
+/**
+ * \file Mtfs.cpp
+ * \brief
+ * \author David Wittwer
+ * \version 0.0.1
+ * \copyright GNU Publis License V3
+ *
+ * This file is part of MTFS.
+
+    MTFS is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Foobar is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <mtfs/Mtfs.h>
 #include <mtfs/Cache.h>
 #include <pluginSystem/PluginManager.h>
@@ -10,10 +33,6 @@
 #include <grp.h>
 #include <pwd.h>
 #include <utils/Logger.h>
-
-#define HOME "/home/david/Cours/4eme/Travail_bachelor/Home/"
-#define SYSTEMS_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Systems/"
-#define PLUGIN_HOME "/home/david/Cours/4eme/Travail_bachelor/Home/Plugins/"
 
 #define GROUPS_TO_SEARCH 30
 //TODO compute this value in function of entry size
@@ -342,7 +361,7 @@ namespace mtfs {
 		}
 	}
 
-	void Mtfs::lookup(fuse_req_t req, fuse_ino_t parent, const string name) {
+	void Mtfs::lookup(fuse_req_t req, fuse_ino_t parent, const string &name) {
 		Logger::getInstance()->log("LOOKUP", name, Logger::L_DEBUG);
 
 		internalInode_st *parentInode = this->getIntInode(parent);
@@ -392,7 +411,7 @@ namespace mtfs {
 		fifoLk.unlock();
 
 
-//		TODO Doit être un pointeur car lookup avant open donc inode doit être en mémoire.
+//		TODO Doit etre un pointeur car lookup avant open donc inode doit etre en memoire.
 		auto *inode = new internalInode_st();
 		inode->idents = inodeIds;
 		int ret;
@@ -432,7 +451,7 @@ namespace mtfs {
 		delete (blkDl.fifo.dirQueue);
 	}
 
-	void Mtfs::mknod(fuse_req_t req, fuse_ino_t parent, const std::string name, mode_t mode, dev_t rdev) {
+	void Mtfs::mknod(fuse_req_t req, fuse_ino_t parent, const string &name, mode_t mode, dev_t rdev) {
 		(void) rdev;
 
 		int ret;
@@ -467,7 +486,7 @@ namespace mtfs {
 		fuse_reply_entry(req, &param);
 	}
 
-	void Mtfs::mkdir(fuse_req_t req, fuse_ino_t ino, const char *name, mode_t mode) {
+	void Mtfs::mkdir(fuse_req_t req, fuse_ino_t ino, const string &name, mode_t mode) {
 		int ret;
 		internalInode_st *parentInode = this->getIntInode(ino);
 
@@ -500,7 +519,7 @@ namespace mtfs {
 		fuse_reply_entry(req, &param);
 	}
 
-	void Mtfs::unlink(fuse_req_t req, fuse_ino_t parent, const char *name) {
+	void Mtfs::unlink(fuse_req_t req, fuse_ino_t parent, const string &name) {
 		internalInode_st *parentInode = this->getIntInode(parent);
 
 		int ret;
@@ -510,7 +529,7 @@ namespace mtfs {
 			fuse_reply_err(req, SUCCESS);
 	}
 
-	void Mtfs::rmdir(fuse_req_t req, fuse_ino_t parent, const char *name) {
+	void Mtfs::rmdir(fuse_req_t req, fuse_ino_t parent, const string &name) {
 		(void) parent, name;
 
 		fuse_reply_err(req, ENOSYS);
@@ -580,7 +599,7 @@ namespace mtfs {
 
 
 		} else {
-			fuse_reply_err(req, ENOSYS);
+			fuse_reply_err(req, SUCCESS);
 		}
 	}
 
@@ -707,8 +726,8 @@ namespace mtfs {
 			vector<ident_t> blockIdents;
 			if (inode->inode.dataBlocks.empty() || inode->inode.dataBlocks.size() <= blockToWrite) {
 				if (SUCCESS !=
-					(ret = this->blocks->add(newBlockInfo, blockIdents, blockType::DATA_BLOCK,
-											 (const int) this->redundancy))) {
+						(ret = this->blocks->add(newBlockInfo, blockIdents, blockType::DATA_BLOCK,
+												 (const int) this->redundancy))) {
 					fuse_reply_err(req, ret);
 					return;
 				}
@@ -851,7 +870,7 @@ namespace mtfs {
 			pool = new Pool(this->blockSize);
 
 			for (auto volSt: poolSt.second.volumes) {
-				volSt.second.params.insert(make_pair("home", PLUGIN_HOME));
+				volSt.second.params.insert(make_pair("home", MTFS_PLUGIN_HOME));
 				volSt.second.params.insert(make_pair("blockSize", to_string(this->blockSize)));
 
 				pluginSystem::Plugin *plugin = manager->getPlugin(volSt.second.pluginName);
@@ -874,7 +893,7 @@ namespace mtfs {
 	}
 
 	void Mtfs::readRootInode() {
-		string filename = string(SYSTEMS_DIR) + "/" + systemName + "/root.json";
+		string filename = string(MTFS_INSTALL_DIR) + "/" + systemName + "/root.json";
 		ifstream file(filename);
 		if (!file.is_open())
 			return;
@@ -932,29 +951,12 @@ namespace mtfs {
 		PrettyWriter<StringBuffer> pw(sb);
 		d.Accept(pw);
 
-		string filename = string(SYSTEMS_DIR) + "/" + systemName + "/root.json";
+		string filename = string(MTFS_INSTALL_DIR) + "/" + systemName + "/root.json";
 		ofstream rootFile(filename);
 		rootFile << sb.GetString() << endl;
 		rootFile.close();
 	}
 
-	void Mtfs::stat(fuse_req_t req, fuse_ino_t ino) {
-		(void) ino;
-
-		fuse_reply_err(req, ENOSYS);
-	}
-
-	/**
-	 * @brief Add entry in directory.
-	 *
-	 * This function add a new entry in directory and update parent inode if necessary.
-	 *
-	 * @param parentInode 	Directory to add entry
-	 * @param name 			Name of entry
-	 * @param inodeIds 		Inodes od entry
-	 *
-	 * @return 				0 if success else errno.
-	 */
 	int Mtfs::addEntry(internalInode_st *parentInode, std::string name, vector<ident_t> &inodeIds) {
 		int ret = 0;
 
@@ -1032,16 +1034,6 @@ namespace mtfs {
 		return 0;
 	}
 
-	/**
-	 * @brief Insert inode in system.
-	 *
-	 * This function get free inode Id and put inode in volumes
-	 *
-	 * @param[in] inode Inode to put
-	 * @param[out] idents Ids to new inode
-	 *
-	 * @return 0 if SUCCESS else @see satic const vars.
-	 */
 	int Mtfs::insertInode(const inode_t &inode, vector<ident_t> &idents) {
 		int ret;
 
@@ -1061,14 +1053,6 @@ namespace mtfs {
 		return ret;
 	}
 
-	/**
-	 * Download all blocks in inode
-	 *
-	 * @param inode Inode who containe the blocks
-	 * @param dlSt Download struct
-	 * @param type Type of block to dowload DIR_BLOCK | DATA_BLOCK
-	 * @param firstBlockIdx Index of first block to download
-	 */
 	void Mtfs::dlBlocks(const inode_t &inode, dl_st *dlSt, const blockType type, const int firstBlockIdx) {
 //		TODO implements
 
@@ -1096,18 +1080,8 @@ namespace mtfs {
 		dlSt->sem->notify();
 	}
 
-	/**
-	 * @brief download or get a directory block.
-	 *
-	 * This function is create for work in a other thread than worker.
-	 *
-	 * @param[in] ids 	Block ids
-	 * @param[out] q 	Queue
-	 * @param[in] queueMutex
-	 * @param[in] sem
-	 */
 	void Mtfs::dlDirBlocks(vector<ident_t> &ids, queue<dirBlock_t> *q, mutex *queueMutex, Semaphore *sem) {
-//	TODO gérer le cas ou aucun bloc n'a pu être dl.
+//	TODO gerer le cas ou aucun bloc n'a pu etre dl.
 		int ret = 1;
 		dirBlock_t db = dirBlock_t();
 
@@ -1124,12 +1098,6 @@ namespace mtfs {
 		}
 	}
 
-	/**
-	 * Download all inodes from dir entries.
-	 *
-	 * @param src dl dir entries struct
-	 * @param dst dl inode struct
-	 */
 	void Mtfs::dlInodes(dl_st *src, dl_st *dst) {
 		pool inodesPool(this->SIMULT_DL);
 		unique_lock<mutex> srcEndLk(*src->endMu, defer_lock);
@@ -1345,7 +1313,7 @@ namespace mtfs {
 		return (uint64_t) time(nullptr);
 	}
 
-	void Mtfs::initMetas(const internalInode_st &parentInode, const std::vector<ident_t> ids, const blockType type,
+	void Mtfs::initMetas(const internalInode_st &parentInode, const vector<ident_t> &ids, const blockType &type,
 						 boost::threadpool::pool *thPool) {
 		blockInfo_t metas = blockInfo_t();
 		metas.lastAccess = (uint64_t) time(nullptr);

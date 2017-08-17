@@ -1,3 +1,26 @@
+/**
+ * \file BlockDevice.cpp
+ * \brief
+ * \author David Wittwer
+ * \version 0.0.1
+ * \copyright GNU Publis License V3
+ *
+ * This file is part of MTFS.
+
+    MTFS is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Foobar is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <iostream>
 #include <sys/mount.h>
 #include <map>
@@ -13,7 +36,7 @@
 
 #include "BlockDevice.h"
 
-//#define DEBUG
+#define DEBUG
 
 using namespace std;
 using namespace rapidjson;
@@ -43,14 +66,14 @@ namespace pluginSystem {
 
 		string home;
 		home = params["home"];
-		if (*home.end() != '/')
+		if (home.back() != '/')
 			home += '/';
 		string parentDir = home + "BlockDevices/";
 		string bs = params["blockSize"];
 		this->blockSize = stoi(params.at("blockSize"));
 		this->fsType = params["fsType"];
 		this->devicePath = params["devicePath"];
-		this->mountpoint = parentDir + this->devicePath.substr(this->devicePath.find('/', 1) + 1);
+		this->mountpoint = parentDir + this->devicePath.substr(this->devicePath.find('/', 1) + 1) + '/';
 
 #ifdef DEBUG
 		Logger::getInstance()->log("BLOCK", "create dir in home", Logger::L_INFO);
@@ -70,10 +93,10 @@ namespace pluginSystem {
 			}
 		}
 
-//#ifndef DEBUG
+#ifndef DEBUG
 		//		Mount device
 		mount(this->devicePath.c_str(), this->mountpoint.c_str(), this->fsType.c_str(), 0, nullptr);
-//#endif
+#endif
 
 		initDirHierarchie();
 
@@ -198,7 +221,6 @@ namespace pluginSystem {
 		return ret;
 	}
 
-
 	int BlockDevice::addInode(uint64_t *inodeId) {
 		unique_lock<mutex> lk(this->inodeMutex);
 		if (this->freeInodes.empty()) {
@@ -210,7 +232,11 @@ namespace pluginSystem {
 		}
 		lk.unlock();
 
-		string filename = this->mountpoint + "/" + INODES_DIR + "/" + to_string(*inodeId);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + INODES_DIR + "/" + to_string(*inodeId);
 
 		return createFile(filename);
 	}
@@ -224,13 +250,21 @@ namespace pluginSystem {
 		}
 		lk.unlock();
 
-		string filename = this->mountpoint + "/" + INODES_DIR + "/" + to_string(inodeId);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + INODES_DIR + "/" + to_string(inodeId);
 
 		return deleteFile(filename);
 	}
 
 	int BlockDevice::getInode(const uint64_t &inodeId, mtfs::inode_st &inode) {
-		string filename = this->mountpoint + "/" + INODES_DIR + "/" + to_string(inodeId);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + INODES_DIR + "/" + to_string(inodeId);
 		ifstream file(filename);
 		if (!file.is_open())
 			return errno != 0 ? errno : ENOENT;
@@ -295,7 +329,11 @@ namespace pluginSystem {
 		PrettyWriter<StringBuffer> pw(sb);
 		d.Accept(pw);
 
-		string filename = this->mountpoint + "/" + BlockDevice::INODES_DIR + "/" + to_string(inodeId);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + BlockDevice::INODES_DIR + "/" + to_string(inodeId);
 		ofstream inodeFile(filename);
 		inodeFile << sb.GetString() << endl;
 		inodeFile.close();
@@ -304,13 +342,21 @@ namespace pluginSystem {
 	}
 
 	int BlockDevice::getInodeMetas(const uint64_t &inodeId, mtfs::blockInfo_t &metas) {
-		string filename = this->mountpoint + "/" + INODE_METAS_DIR + "/" + to_string(inodeId) + ".json";
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + INODE_METAS_DIR + "/" + to_string(inodeId) + ".json";
 
 		return getMetas(filename, metas);
 	}
 
 	int BlockDevice::putInodeMetas(const uint64_t &inodeId, const mtfs::blockInfo_t &metas) {
-		string filename = this->mountpoint + "/" + INODE_METAS_DIR + "/" + to_string(inodeId) + ".json";
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + INODE_METAS_DIR + "/" + to_string(inodeId) + ".json";
 
 		return putMetas(filename, metas);
 	}
@@ -327,7 +373,11 @@ namespace pluginSystem {
 		}
 		lk.unlock();
 
-		string filename = this->mountpoint + "/" + DIR_BLOCKS_DIR + "/" + to_string(*id);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + DIR_BLOCKS_DIR + "/" + to_string(*id);
 
 		return createFile(filename);
 	}
@@ -340,12 +390,22 @@ namespace pluginSystem {
 			this->freeDirBlocks.push_back(id);
 		lk.unlock();
 
-		string filename = this->mountpoint + "/" + DIR_BLOCKS_DIR + "/" + to_string(id);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + DIR_BLOCKS_DIR + "/" + to_string(id);
+
 		return deleteFile(filename);
 	}
 
 	int BlockDevice::getDirBlock(const uint64_t &id, dirBlock_t &block) {
-		string filename = this->mountpoint + "/" + DIR_BLOCKS_DIR + "/" + to_string(id);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + DIR_BLOCKS_DIR + "/" + to_string(id);
+
 		ifstream file(filename);
 		if (!file.is_open())
 			return errno != 0 ? errno : ENOENT;
@@ -393,7 +453,11 @@ namespace pluginSystem {
 		PrettyWriter<StringBuffer> pw(sb);
 		d.Accept(pw);
 
-		string filename = this->mountpoint + "/" + BlockDevice::DIR_BLOCKS_DIR + "/" + to_string(id);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + BlockDevice::DIR_BLOCKS_DIR + "/" + to_string(id);
 		ofstream file(filename);
 		if (!file.is_open())
 			return errno != 0 ? errno : ENOENT;
@@ -404,18 +468,26 @@ namespace pluginSystem {
 	}
 
 	int BlockDevice::getDirBlockMetas(const uint64_t &id, mtfs::blockInfo_t &metas) {
-		string filename = this->mountpoint + "/" + DIR_BLOCK_METAS_DIR + "/" + to_string(id) + ".json";
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + DIR_BLOCK_METAS_DIR + "/" + to_string(id) + ".json";
 		return getMetas(filename, metas);
 	}
 
 	int BlockDevice::putDirBlockMetas(const uint64_t &id, const mtfs::blockInfo_t &metas) {
-		string filename = this->mountpoint + "/" + DIR_BLOCK_METAS_DIR + "/" + to_string(id) + ".json";
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + DIR_BLOCK_METAS_DIR + "/" + to_string(id) + ".json";
 		return putMetas(filename, metas);
 	}
 
 	int BlockDevice::addBlock(uint64_t *blockId) {
 		unique_lock<mutex> lk(this->blockMutex);
-		if (this->freeBlocks.size() == 0) {
+		if (this->freeBlocks.empty()) {
 			*blockId = this->nextFreeBlock;
 			this->nextFreeBlock++;
 		} else {
@@ -424,7 +496,11 @@ namespace pluginSystem {
 		}
 		lk.unlock();
 
-		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(*blockId);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + BLOCKS_DIR + "/" + to_string(*blockId);
 
 		return createFile(filename);
 	}
@@ -437,13 +513,22 @@ namespace pluginSystem {
 			this->freeBlocks.push_back(blockId);
 		lk.unlock();
 
-		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + BLOCKS_DIR + "/" + to_string(blockId);
 
 		return deleteFile(filename);
 	}
 
 	int BlockDevice::getBlock(const uint64_t &blockId, std::uint8_t *buffer) {
-		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + BLOCKS_DIR + "/" + to_string(blockId);
+
 		ifstream file(filename);
 		if (!file.is_open())
 			return errno != 0 ? errno : ENOENT;
@@ -454,7 +539,11 @@ namespace pluginSystem {
 	}
 
 	int BlockDevice::putBlock(const uint64_t &blockId, const uint8_t *buffer) {
-		string filename = this->mountpoint + "/" + BLOCKS_DIR + "/" + to_string(blockId);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + BLOCKS_DIR + "/" + to_string(blockId);
 		ofstream file(filename);
 		if (!file.is_open())
 			return errno != 0 ? errno : ENOENT;
@@ -465,13 +554,21 @@ namespace pluginSystem {
 	}
 
 	int BlockDevice::getBlockMetas(const uint64_t &blockId, mtfs::blockInfo_t &metas) {
-		string filename = this->mountpoint + "/" + BLOCK_METAS_DIR + "/" + to_string(blockId) + ".json";
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + BLOCK_METAS_DIR + "/" + to_string(blockId) + ".json";
 
 		return getMetas(filename, metas);
 	}
 
 	int BlockDevice::putBlockMetas(const uint64_t &blockId, const blockInfo_t &metas) {
-		string filename = this->mountpoint + "/" + BLOCK_METAS_DIR + "/" + to_string(blockId) + ".json";
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + BLOCK_METAS_DIR + "/" + to_string(blockId) + ".json";
 
 		return putMetas(filename, metas);
 	}
@@ -481,7 +578,12 @@ namespace pluginSystem {
 	}
 
 	bool BlockDevice::putSuperblock(const superblock_t &superblock) {
-		ofstream sbFile(this->mountpoint + "/" + METAS_DIR + "/superblock", ios::binary);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + METAS_DIR + "/superblock";
+		ofstream sbFile(filename, ios::binary);
 		sbFile.write((const char *) &superblock, sizeof(superblock));
 		sbFile.close();
 
@@ -491,25 +593,30 @@ namespace pluginSystem {
 	/////////////Private method///////////////
 
 	void BlockDevice::initDirHierarchie() {
-		if (!dirExists(this->mountpoint + "/" + BlockDevice::INODES_DIR))
-			mkdir((this->mountpoint + "/" + BlockDevice::INODES_DIR).c_str(), 0700);
-		if (!dirExists(this->mountpoint + "/" + BlockDevice::DIR_BLOCKS_DIR))
-			mkdir((this->mountpoint + "/" + BlockDevice::DIR_BLOCKS_DIR).c_str(), 0700);
-		if (!dirExists(this->mountpoint + "/" + BlockDevice::BLOCKS_DIR))
-			mkdir((this->mountpoint + "/" + BlockDevice::BLOCKS_DIR).c_str(), 0700);
-		if (!dirExists(this->mountpoint + "/" + BlockDevice::METAS_DIR))
-			mkdir((this->mountpoint + "/" + BlockDevice::METAS_DIR).c_str(), 0700);
-		if (!dirExists(this->mountpoint + "/" + BlockDevice::INODE_METAS_DIR))
-			mkdir((this->mountpoint + "/" + BlockDevice::INODE_METAS_DIR).c_str(), 0700);
-		if (!dirExists(this->mountpoint + "/" + BlockDevice::DIR_BLOCK_METAS_DIR))
-			mkdir((this->mountpoint + "/" + BlockDevice::DIR_BLOCK_METAS_DIR).c_str(), 0700);
-		if (!dirExists(this->mountpoint + "/" + BlockDevice::BLOCK_METAS_DIR))
-			mkdir((this->mountpoint + "/" + BlockDevice::BLOCK_METAS_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + BlockDevice::INODES_DIR))
+			mkdir((this->mountpoint + BlockDevice::INODES_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + BlockDevice::DIR_BLOCKS_DIR))
+			mkdir((this->mountpoint + BlockDevice::DIR_BLOCKS_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + BlockDevice::BLOCKS_DIR))
+			mkdir((this->mountpoint + BlockDevice::BLOCKS_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + BlockDevice::METAS_DIR))
+			mkdir((this->mountpoint + BlockDevice::METAS_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + BlockDevice::INODE_METAS_DIR))
+			mkdir((this->mountpoint + BlockDevice::INODE_METAS_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + BlockDevice::DIR_BLOCK_METAS_DIR))
+			mkdir((this->mountpoint + BlockDevice::DIR_BLOCK_METAS_DIR).c_str(), 0700);
+		if (!dirExists(this->mountpoint + BlockDevice::BLOCK_METAS_DIR))
+			mkdir((this->mountpoint + BlockDevice::BLOCK_METAS_DIR).c_str(), 0700);
 	}
 
 	void BlockDevice::initInodes() {
-		string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/inodes.json";
-		ifstream inodeFile(inodeFilename);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + METAS_DIR + "/inodes.json";
+
+		ifstream inodeFile(filename);
 		if (!inodeFile.is_open())
 			return;
 
@@ -532,7 +639,12 @@ namespace pluginSystem {
 	}
 
 	void BlockDevice::initDirBlocks() {
-		string filename = this->mountpoint + "/" + METAS_DIR + "/dirBlocks.json";
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + METAS_DIR + "/dirBlocks.json";
+
 		ifstream inodeFile(filename);
 		if (!inodeFile.is_open())
 			return;
@@ -556,8 +668,13 @@ namespace pluginSystem {
 	}
 
 	void BlockDevice::initBlocks() {
-		string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/blocks.json";
-		ifstream inodeFile(inodeFilename);
+		string filename = this->mountpoint;
+		if ('/' != filename.back())
+			filename += '/';
+
+		filename = filename + METAS_DIR + "/blocks.json";
+
+		ifstream inodeFile(filename);
 		if (!inodeFile.is_open())
 			return;
 
@@ -587,16 +704,16 @@ namespace pluginSystem {
 
 			Document::AllocatorType &allocator = d.GetAllocator();
 
-			Value freeInode(kObjectType);
-			freeInode.SetUint64(this->nextFreeInode);
-			d.AddMember(StringRef("nextFreeInode"), freeInode, allocator);
+			Value value(kObjectType);
+			value.SetUint64(this->nextFreeInode);
+			d.AddMember(StringRef("nextFreeInode"), value, allocator);
 
 			Value inodeList(kArrayType);
 			Value inode(kObjectType);
 
-			for (auto b = this->freeInodes.begin(); b != this->freeInodes.end(); b++) {
-				inode.SetUint64(*b);
-				inodeList.PushBack(Value(*b), allocator);
+			for (unsigned long &freeInode : this->freeInodes) {
+				inode.SetUint64(freeInode);
+				inodeList.PushBack(Value(freeInode), allocator);
 			}
 
 			d.AddMember(StringRef("freeInodes"), inodeList, allocator);
@@ -605,9 +722,14 @@ namespace pluginSystem {
 			PrettyWriter<StringBuffer> writer(strBuff);
 			d.Accept(writer);
 
-			string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/inodes.json";
+			string filename = this->mountpoint;
+			if ('/' != filename.back())
+				filename += '/';
+
+			filename = filename + METAS_DIR + "/inodes.json";
+
 			ofstream inodeFile;
-			inodeFile.open(inodeFilename);
+			inodeFile.open(filename);
 			inodeFile << strBuff.GetString() << endl;
 			inodeFile.close();
 		}
@@ -626,9 +748,9 @@ namespace pluginSystem {
 			Value inodeList(kArrayType);
 			Value inode(kObjectType);
 
-			for (auto b = this->freeDirBlocks.begin(); b != this->freeDirBlocks.end(); b++) {
-				inode.SetUint64(*b);
-				inodeList.PushBack(Value(*b), allocator);
+			for (unsigned long &freeDirBlock : this->freeDirBlocks) {
+				inode.SetUint64(freeDirBlock);
+				inodeList.PushBack(Value(freeDirBlock), allocator);
 			}
 
 			d.AddMember(StringRef("freeDirBlocks"), inodeList, allocator);
@@ -637,9 +759,14 @@ namespace pluginSystem {
 			PrettyWriter<StringBuffer> writer(strBuff);
 			d.Accept(writer);
 
-			string inodeFilename = this->mountpoint + "/" + METAS_DIR + "/dirBlocks.json";
+			string filename = this->mountpoint;
+			if ('/' != filename.back())
+				filename += '/';
+
+			filename = filename + METAS_DIR + "/dirBlocks.json";
+
 			ofstream inodeFile;
-			inodeFile.open(inodeFilename);
+			inodeFile.open(filename);
 			inodeFile << strBuff.GetString() << endl;
 			inodeFile.close();
 		}
@@ -667,9 +794,14 @@ namespace pluginSystem {
 			PrettyWriter<StringBuffer> bWriter(bStrBuff);
 			db.Accept(bWriter);
 
-			string blockFilename = this->mountpoint + "/" + METAS_DIR + "/blocks.json";
+			string filename = this->mountpoint;
+			if ('/' != filename.back())
+				filename += '/';
+
+			filename = filename + METAS_DIR + "/blocks.json";
+
 			ofstream blockFile;
-			blockFile.open(blockFilename);
+			blockFile.open(filename);
 			blockFile << bStrBuff.GetString() << endl;
 			blockFile.close();
 		}
@@ -729,7 +861,7 @@ namespace pluginSystem {
 			uint32_t volumeId = id[ID_VOLUME].GetUint();
 			uint64_t i = id[ID_ID].GetUint64();
 
-			infos.referenceId.push_back(ident_st(i, volumeId, poolId));
+			infos.referenceId.emplace_back(i, volumeId, poolId);
 		}
 
 		infos.lastAccess = d[BI_ACCESS].GetUint64();

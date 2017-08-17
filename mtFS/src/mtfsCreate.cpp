@@ -1,11 +1,25 @@
 /**
- * @author David Wittwer
- * @date 30.04.17.
-**/
-#define HOME_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/"
-#define PLUGIN_HOME "/home/david/Cours/4eme/Travail_bachelor/Home/Plugins/"
-#define CONF_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Configs/"
-#define INSTALL_DIR "/home/david/Cours/4eme/Travail_bachelor/Home/Systems/"
+ * \file mtfsCreate.cpp
+ * \brief
+ * \author David Wittwer
+ * \version 0.0.1
+ * \copyright GNU Publis License V3
+ *
+ * This file is part of MTFS.
+
+    MTFS is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Foobar is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 //#include <mtfs/structs.h>
 #include <option/optionparser.h>
@@ -118,6 +132,7 @@ void installConfig(superblock_t &superblock, const string &name);
 
 
 int main(int argc, char **argv) {
+	std::cout << MTFS_PLUGIN_HOME << std::endl;
 	argc -= (argc > 0);
 	argv += (argc > 0);
 	option::Stats stats(usage, argc, argv);
@@ -142,7 +157,7 @@ int main(int argc, char **argv) {
 		std::cout << "Non-option #" << i << ": " << parse.nonOption(i) << "\n";
 #endif
 
-	if (0 != chdir(HOME_DIR)) {
+	if (0 != chdir(MTFS_HOME_DIR)) {
 		return errno;
 	}
 
@@ -337,11 +352,11 @@ int main(int argc, char **argv) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool configExist(const string &name) {
-	return Fs::fileExists(CONF_DIR, name + ".json");
+	return Fs::fileExists(MTFS_CONFIG_DIR, name + ".json");
 }
 
 void loadConfig(superblock_t &sb, const string &name) {
-	string filename = string(CONF_DIR) + name + ".json";
+	string filename = string(MTFS_CONFIG_DIR) + name + ".json";
 	ifstream file(filename);
 	if (!file.is_open()) {
 		return;
@@ -368,7 +383,7 @@ bool writeConfig(superblock_t &superblock, const string &confName) {
 	PrettyWriter<StringBuffer> pw(sb);
 	d.Accept(pw);
 
-	string filename = string(CONF_DIR) + confName + ".json";
+	string filename = string(MTFS_CONFIG_DIR) + confName + ".json";
 	ofstream configFile(filename);
 	configFile << sb.GetString() << endl;
 	configFile.close();
@@ -475,11 +490,11 @@ void installConfig(superblock_t &superblock, const string &name) {
 	writeConfig(superblock, name);
 
 	string filename = "superblock.json";
-	boost::filesystem::create_directory(INSTALL_DIR + name);
-	string src = string(CONF_DIR) + name + ".json";
-	string dst = string(INSTALL_DIR) + name + "/" + filename;
+	boost::filesystem::create_directory(MTFS_INSTALL_DIR + name);
+	string src = string(MTFS_CONFIG_DIR) + name + ".json";
+	string dst = string(MTFS_INSTALL_DIR) + name + "/" + filename;
 	boost::filesystem::copy_file(src, dst, boost::filesystem::copy_option::overwrite_if_exists);
-	string rootFilename = string(INSTALL_DIR) + name + "/root.json";
+	string rootFilename = string(MTFS_INSTALL_DIR) + name + "/root.json";
 
 	inode_t rootInode;
 	Mtfs::createRootInode(rootInode);
@@ -493,7 +508,7 @@ void installConfig(superblock_t &superblock, const string &name) {
 	i = 0;
 	for (auto &&pool: superblock.pools) {
 		for (auto &&volume: pool.second.volumes) {
-			volume.second.params["home"] = PLUGIN_HOME;
+			volume.second.params["home"] = MTFS_PLUGIN_HOME;
 			volume.second.params["blockSize"] = to_string(superblock.blockSz);
 
 			pluginSystem::Plugin *plugin;

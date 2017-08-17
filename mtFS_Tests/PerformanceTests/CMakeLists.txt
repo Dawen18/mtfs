@@ -1,0 +1,3 @@
+add_executable(perfTests main.cpp)
+
+target_link_libraries(perfTests boost_system boost_filesystem boost_thread)

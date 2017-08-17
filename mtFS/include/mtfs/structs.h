@@ -1,7 +1,25 @@
 /**
- * @author David Wittwer
- * @date 22.04.17.
-**/
+ * \file structs.h
+ * \brief
+ * \author David Wittwer
+ * \version 0.0.1
+ * \copyright GNU Publis License V3
+ *
+ * This file is part of MTFS.
+
+    MTFS is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Foobar is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #ifndef TRAVAIL_BACHELOR_STRUCTS_H
 #define TRAVAIL_BACHELOR_STRUCTS_H
@@ -9,7 +27,7 @@
 #include <map>
 #include <rapidjson/document.h>
 
-#define IN_MODE "accessRight"
+#define IN_MODE "mode"
 #define IN_UID "uid"
 #define IN_GID "gid"
 #define IN_SIZE "size"
@@ -49,9 +67,7 @@ namespace mtfs {
 		gid_t gid;
 		uint64_t lastAccess;
 
-		ruleInfo_st() {
-			ruleInfo_st(0, 0, 0);
-		}
+		ruleInfo_st() : ruleInfo_st(0, 0, 0) {}
 
 		ruleInfo_st(uid_t uid, gid_t gid, uint64_t atime) : uid(uid), gid(gid), lastAccess(atime) {}
 	} ruleInfo_t;
@@ -317,43 +333,6 @@ namespace mtfs {
 		int migration;
 		std::map<uint32_t, pool_t> pools;
 		std::vector<ident_t> rootInodes;
-
-//		void toJson(rapidjson::Document &d) const {
-//			d.SetObject();
-//			rapidjson::Document::AllocatorType &allocator = d.GetAllocator();
-//
-//			rapidjson::Value v;
-//
-//			v.SetInt(this->iCacheSz);
-//			d.AddMember(rapidjson::StringRef(SB_INODE_CACHE), v, allocator);
-//
-//			v.SetInt(this->dCacheSz);
-//			d.AddMember(rapidjson::StringRef(SB_DIR_CACHE), v, allocator);
-//
-//			v.SetInt(this->bCacheSz);
-//			d.AddMember(rapidjson::StringRef(SB_BLOCK_CACHE), v, allocator);
-//
-//			v.SetInt(this->blockSz);
-//			d.AddMember(rapidjson::StringRef(SB_BLOCK_SIZE_ST), v, allocator);
-//
-//			v.SetInt(this->redundancy);
-//			d.AddMember(rapidjson::StringRef(SB_REDUNDANCY), v, allocator);
-//
-//			v.SetInt(this->migration);
-//			d.AddMember(rapidjson::StringRef(RU_MIGRATION), v, allocator);
-//
-//			rapidjson::Value pools(rapidjson::kObjectType);
-//			for (auto &&item : this->pools) {
-//				rapidjson::Value pool(rapidjson::kObjectType);
-//
-////				Pool::structToJson(item.second, pool, allocator);
-//
-//				std::string id = std::to_string(item.first);
-//				rapidjson::Value index(id.c_str(), (rapidjson::SizeType) id.size(), allocator);
-//				pools.AddMember(index, pool, allocator);
-//			}
-//			d.AddMember(rapidjson::StringRef(PO_POOLS), pools, allocator);
-//		}
 	} superblock_t;
 
 	typedef struct blockInfo_st {
@@ -372,9 +351,7 @@ namespace mtfs {
 			return (other.lastAccess == this->lastAccess);
 		}
 
-		blockInfo_st() : id(ident_t()) {
-//			referenceId.clear();
-		};
+		blockInfo_st() : id(ident_t()) {};
 
 		void toJson(rapidjson::Document &d) {
 			d.SetObject();
@@ -421,11 +398,6 @@ namespace mtfs {
 		}
 
 	} blockInfo_t;
-
-	typedef struct move_st {
-		ident_t previousId;
-		ident_t newId;
-	} move_t;
 
 
 }  // namespace mtFS
