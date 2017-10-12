@@ -98,8 +98,7 @@ namespace pluginSystem {
 	}
 
 	bool PluginManager::pluginExist(std::string name) {
-		string dir("./");
-		dir += PLUGIN_DIR;
+		string dir(MTFS_PLUGIN_LIB);
 
 		if (is_directory(dir)) {
 			for (auto &entry  :boost::make_iterator_range(directory_iterator(dir))) {
@@ -113,7 +112,7 @@ namespace pluginSystem {
 
 	Plugin *PluginManager::loadPlugin(string name) {
 		plugin_t plugin{};
-		string path = string("./") + PLUGIN_DIR + "/lib" + name + ".so";
+		string path = string(MTFS_PLUGIN_LIB) + "/lib" + name + ".so";
 
 //		Open plugin
 		void *library = dlopen(path.c_str(), RTLD_LAZY);

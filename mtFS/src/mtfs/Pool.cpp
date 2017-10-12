@@ -27,7 +27,7 @@
 using namespace std;
 
 namespace mtfs {
-	Pool::Pool(const size_t blkSize) : blockSize(blkSize) {}
+	Pool::Pool(const size_t &blkSize) : blockSize(blkSize) {}
 
 	Pool::~Pool() {
 		for (auto &&vol: this->volumes) {
@@ -116,7 +116,7 @@ namespace mtfs {
 		return 0;
 	}
 
-	int Pool::add(const ruleInfo_t &info, std::vector<ident_t> &idents, const blockType type, const int nb) {
+	int Pool::add(const ruleInfo_t &info, std::vector<ident_t> &idents, const blockType &type, const int &nb) {
 		int ret;
 		vector<uint32_t> volumeIds;
 		if (0 != (ret = this->getValidVolumes(info, volumeIds))) {
@@ -158,23 +158,23 @@ namespace mtfs {
 		return ret;
 	}
 
-	int Pool::del(const uint32_t &volumeId, const uint64_t &id, const blockType type) {
+	int Pool::del(const uint32_t &volumeId, const uint64_t &id, const blockType &type) {
 		return this->volumes[volumeId]->del(id, type);
 	}
 
-	int Pool::get(const uint32_t &volumeId, const uint64_t &id, void *data, const blockType type) {
+	int Pool::get(const uint32_t &volumeId, const uint64_t &id, void *data, const blockType &type) {
 		return this->volumes[volumeId]->get(id, data, type);
 	}
 
-	int Pool::put(const uint32_t &volumeId, const uint64_t &id, const void *data, const blockType type) {
+	int Pool::put(const uint32_t &volumeId, const uint64_t &id, const void *data, const blockType &type) {
 		return this->volumes[volumeId]->put(id, data, type);
 	}
 
-	int Pool::getMetas(const uint32_t &volumeId, const uint64_t &id, blockInfo_t &metas, const blockType type) {
+	int Pool::getMetas(const uint32_t &volumeId, const uint64_t &id, blockInfo_t &metas, const blockType &type) {
 		return this->volumes[volumeId]->getMetas(id, metas, type);
 	}
 
-	int Pool::putMetas(const uint32_t &volumeId, const uint64_t &id, const blockInfo_t &metas, const blockType type) {
+	int Pool::putMetas(const uint32_t &volumeId, const uint64_t &id, const blockInfo_t &metas, const blockType &type) {
 		return this->volumes[volumeId]->putMetas(id, metas, type);
 	}
 
@@ -187,7 +187,7 @@ namespace mtfs {
 	}
 
 	void
-	Pool::doMigration(std::map<ident_t, ident_t> &movedBlk, std::vector<ident_t> &unsatisfyBlk, const blockType type) {
+	Pool::doMigration(std::map<ident_t, ident_t> &movedBlk, std::vector<ident_t> &unsatisfyBlk, const blockType &type) {
 		for (auto &&volume :this->volumes) {
 			Logger::getInstance()->log("Pool.doMigration", "do migration for volume: " + to_string(volume.first),
 									   Logger::L_DEBUG);

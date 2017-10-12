@@ -132,7 +132,7 @@ void installConfig(superblock_t &superblock, const string &name);
 
 
 int main(int argc, char **argv) {
-	std::cout << MTFS_PLUGIN_HOME << std::endl;
+//	std::cout << MTFS_CONFIG_DIR << std::endl;
 	argc -= (argc > 0);
 	argv += (argc > 0);
 	option::Stats stats(usage, argc, argv);
@@ -268,8 +268,14 @@ int main(int argc, char **argv) {
 
 			pool.rule = Rule::buildRule(superblock.migration, tmpDoc);
 		} else {
-			cerr << "config needed!" << endl;
-			return -1;
+//			cerr << "config needed!" << endl;
+//			return -1;
+			Document d;
+			d.SetObject();
+			Value v;
+			v.SetInt(0);
+			d.AddMember(StringRef("timeHighLimit"), v, d.GetAllocator());
+			pool.rule = Rule::buildRule(superblock.migration, d);
 		}
 
 		int newPoolId = addPool(superblock, pool);

@@ -44,18 +44,8 @@ namespace mtfs {
 		static const int NO_VALID_VOLUME = 2;
 
 
-		void
-		doMigration(std::map<ident_t, ident_t> &movedBlk, std::vector<ident_t> &unsatisfyBlk, const blockType type);
-
-	private:
-		const size_t blockSize;
-
-		std::map<uint32_t, Volume *> volumes;
-		std::map<uint32_t, Rule *> rules;
-
-
 	public:
-		Pool(const size_t blkSize);
+		Pool(const size_t &blkSize);
 
 		virtual ~Pool();
 
@@ -68,19 +58,28 @@ namespace mtfs {
 
 		int addVolume(uint32_t volumeId, Volume *volume, Rule *rule);
 
-		int add(const ruleInfo_t &info, std::vector<ident_t> &idents, const blockType type, const int nb = 1);
+		int add(const ruleInfo_t &info, std::vector<ident_t> &idents, const blockType &type, const int &nb = 1);
 
-		int del(const uint32_t &volumeId, const uint64_t &id, const blockType type);
+		int del(const uint32_t &volumeId, const uint64_t &id, const blockType &type);
 
-		int get(const uint32_t &volumeId, const uint64_t &id, void *data, const blockType type);
+		int get(const uint32_t &volumeId, const uint64_t &id, void *data, const blockType &type);
 
-		int put(const uint32_t &volumeId, const uint64_t &id, const void *data, const blockType type);
+		int put(const uint32_t &volumeId, const uint64_t &id, const void *data, const blockType &type);
 
-		int getMetas(const uint32_t &volumeId, const uint64_t &id, blockInfo_t &metas, const blockType type);
+		int getMetas(const uint32_t &volumeId, const uint64_t &id, blockInfo_t &metas, const blockType &type);
 
-		int putMetas(const uint32_t &volumeId, const uint64_t &id, const blockInfo_t &metas, const blockType type);
+		int putMetas(const uint32_t &volumeId, const uint64_t &id, const blockInfo_t &metas, const blockType &type);
+
+		void
+		doMigration(std::map<ident_t, ident_t> &movedBlk, std::vector<ident_t> &unsatisfyBlk, const blockType &type);
+
 
 	private:
+		const size_t blockSize;
+
+		std::map<uint32_t, Volume *> volumes;
+		std::map<uint32_t, Rule *> rules;
+
 
 		int getValidVolumes(const ruleInfo_t &info, std::vector<uint32_t> &volumeIds);
 	};

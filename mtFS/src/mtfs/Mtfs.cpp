@@ -726,8 +726,8 @@ namespace mtfs {
 			vector<ident_t> blockIdents;
 			if (inode->inode.dataBlocks.empty() || inode->inode.dataBlocks.size() <= blockToWrite) {
 				if (SUCCESS !=
-						(ret = this->blocks->add(newBlockInfo, blockIdents, blockType::DATA_BLOCK,
-												 (const int) this->redundancy))) {
+					(ret = this->blocks->add(newBlockInfo, blockIdents, blockType::DATA_BLOCK,
+											 (const int) this->redundancy))) {
 					fuse_reply_err(req, ret);
 					return;
 				}
@@ -850,11 +850,22 @@ namespace mtfs {
 		this->rootIn = new internalInode_st();
 	}
 
+	/**
+	 * Get the root inode
+	 *
+	 * @return the inode
+	 */
 	inode_t Mtfs::getRootInode() {
 		return this->rootIn->inode;
 //		return this->rootInode;
 	}
 
+	/**
+	 * Build MTFS system
+	 *
+	 * @param superblock
+	 * @return
+	 */
 	bool Mtfs::build(const superblock_t &superblock) {
 
 		this->redundancy = superblock.redundancy;
@@ -892,6 +903,9 @@ namespace mtfs {
 		return true;
 	}
 
+	/**
+	 * Read the root inode
+	 */
 	void Mtfs::readRootInode() {
 		string filename = string(MTFS_INSTALL_DIR) + "/" + systemName + "/root.json";
 		ifstream file(filename);
@@ -942,6 +956,9 @@ namespace mtfs {
 		}
 	}
 
+	/**
+	 * Write the root inode
+	 */
 	void Mtfs::writeRootInode() {
 		Document d;
 
@@ -957,6 +974,17 @@ namespace mtfs {
 		rootFile.close();
 	}
 
+	/**
+	 * @brief Add entry in directory.
+	 *
+	 * This function add a new entry in directory and update parent inode if necessary.
+	 *
+	 * @param parentInode 	Directory to add entry
+	 * @param name 			Name of entry
+	 * @param inodeIds 		Inodes od entry
+	  *
+	  * @return 				0 if success else errno.
+	  */
 	int Mtfs::addEntry(internalInode_st *parentInode, std::string name, vector<ident_t> &inodeIds) {
 		int ret = 0;
 
@@ -1034,6 +1062,16 @@ namespace mtfs {
 		return 0;
 	}
 
+	/**
+	 * @brief Insert inode in system.
+	 *
+	 * This function get free inode Id and put inode in volumes
+	 *
+	 * @param[in] inode Inode to put
+	 * @param[out] idents Ids to new inode
+	 *
+	 * @return 0 if SUCCESS else @see satic const vars.
+	 */
 	int Mtfs::insertInode(const inode_t &inode, vector<ident_t> &idents) {
 		int ret;
 
@@ -1053,6 +1091,14 @@ namespace mtfs {
 		return ret;
 	}
 
+	/**
+	 * Download all blocks in inode
+	 *
+	 * @param inode Inode who containe the blocks
+	 * @param dlSt Download struct
+	 * @param type Type of block to dowload DIR_BLOCK | DATA_BLOCK
+	 * @param firstBlockIdx Index of first block to download
+	 */
 	void Mtfs::dlBlocks(const inode_t &inode, dl_st *dlSt, const blockType type, const int firstBlockIdx) {
 //		TODO implements
 
@@ -1080,6 +1126,16 @@ namespace mtfs {
 		dlSt->sem->notify();
 	}
 
+	/**
+	 * @brief download or get a directory block.
+	 *
+	 * This function is create for work in a other thread than worker.
+	 *
+	 * @param[in] ids 	Block ids
+	 * @param[out] q 	Queue
+	 * @param[in] queueMutex
+	 * @param[in] sem
+	 */
 	void Mtfs::dlDirBlocks(vector<ident_t> &ids, queue<dirBlock_t> *q, mutex *queueMutex, Semaphore *sem) {
 //	TODO gerer le cas ou aucun bloc n'a pu etre dl.
 		int ret = 1;
@@ -1098,6 +1154,12 @@ namespace mtfs {
 		}
 	}
 
+	/**
+	 * Download all inodes from dir entries.
+	 *
+	 * @param src dl dir entries struct
+	 * @param dst dl inode struct
+	 */
 	void Mtfs::dlInodes(dl_st *src, dl_st *dst) {
 		pool inodesPool(this->SIMULT_DL);
 		unique_lock<mutex> srcEndLk(*src->endMu, defer_lock);
@@ -1138,6 +1200,15 @@ namespace mtfs {
 		dst->sem->notify();
 	}
 
+	/**
+	 * Download inodes
+	 *
+	 * @param ids
+	 * @param queue
+	 * @param queueMutex
+	 * @param sem
+	 * @param key
+	 */
 	void
 	Mtfs::dlInode(vector<ident_t> &ids, queue<pair<string, inode_t>> *queue, mutex *queueMutex, Semaphore *sem,
 				  string &key) {
@@ -1313,6 +1384,14 @@ namespace mtfs {
 		return (uint64_t) time(nullptr);
 	}
 
+	/**
+	 * Init metas blocs
+	 *
+	 * @param parentInode
+	 * @param ids
+	 * @param type
+	 * @param thPool
+	 */
 	void Mtfs::initMetas(const internalInode_st &parentInode, const vector<ident_t> &ids, const blockType &type,
 						 boost::threadpool::pool *thPool) {
 		blockInfo_t metas = blockInfo_t();
