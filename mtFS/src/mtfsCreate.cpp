@@ -21,6 +21,8 @@
     along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define FUSE_USE_VERSION 30
+
 //#include <mtfs/structs.h>
 #include <option/optionparser.h>
 #include <iostream>

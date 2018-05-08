@@ -24,6 +24,8 @@
 #ifndef MTFSFUSE_FUSE_CALLBACK_H
 #define MTFSFUSE_FUSE_CALLBACK_H
 
+#define FUSE_USE_VERSION 30
+
 #include <fuse3/fuse_lowlevel.h>
 #include <string>
 #include <vector>

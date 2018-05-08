@@ -62,7 +62,7 @@ set(UTILS
 		)
 
 set(CMAKE_PREFIX_PATH /opt/aws-build)
-find_package(aws-sdk-cpp)
+#find_package(aws-sdk-cpp)
 add_definitions(-DUSE_IMPORT_EXPORT)
 
 add_executable(mtfsCreate src/mtfsCreate.cpp

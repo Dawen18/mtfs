@@ -24,6 +24,8 @@
 #ifndef FILESTORAGE_MTFS_H
 #define FILESTORAGE_MTFS_H
 
+#define FUSE_USE_VERSION 30
+
 #include <thread>
 
 #include <mtfs/Rule.h>
